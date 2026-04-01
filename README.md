@@ -6,22 +6,22 @@
 
 I got tired of checking Hacker News, Reddit, GitHub, and Arxiv every day just to see if someone posted something I should know about. 500+ posts a day, and maybe 10 of them actually matter to what I'm working on. I was either spending an hour scrolling or missing things that mattered.
 
-So I built a thing that reads all of it for me, figures out what's relevant, and sends me one Telegram message in the morning. If something blows up during the day or someone writes a comment I should respond to, it tells me right away.
+So I built a thing that reads all of it for me, figures out what's relevant, and sends me a Telegram message with a summary and links. If something blows up during the day or someone writes a comment I should respond to, it tells me right away.
 
 It runs on your machine with a local AI model. Nothing goes to the cloud. You tell it what you care about in plain English and it does the rest.
 
 ## What you get
 
-One message a day on Telegram. Summary of what happened, what's gaining traction, which conversations might be worth jumping into. Below that, every relevant link so you can click through.
+**Briefings on a schedule you set.** You pick the hours (e.g. 8am and 8pm UTC). At each one, you get a summary of everything relevant since the last briefing, plus links to every story. If you weren't running the app when a briefing was due, you get it the moment you start it up.
 
-Real-time pings when:
+**Real-time pings when:**
 - A post in your area suddenly takes off
-- Someone writes something you'd want to respond to
+- Someone writes a comment you'd want to respond to
 - Someone replies to your HN comment (HN doesn't do notifications)
 - A new project shows up that's in your space
 - One of your GitHub repos gets a release or stars spike
 
-Weekly trend report. What topics grew, what faded, what launched.
+**Weekly trend report.** What topics grew, what faded, what launched.
 
 Everything also saves as markdown files locally if you want to search later.
 
@@ -29,28 +29,28 @@ Everything also saves as markdown files locally if you want to search later.
 
 | Source | How |
 |--------|-----|
-| Hacker News | Algolia API (free, no auth) |
-| GitHub | API (free, optional token for higher limits) |
-| Reddit | RSS feeds (free, no auth) |
-| Arxiv | API (free, no auth) |
+| Hacker News | Algolia API (free, no auth needed) |
+| GitHub | Search API (free, optional token for higher limits) |
+| Reddit | RSS feeds (free, no auth needed) |
+| Arxiv | Public API (free, no auth needed) |
 
 ## How it knows what you care about
 
-You describe it in `config.json`:
+You write your interests in plain language in `config.json`:
 
 ```json
 "interests": [
-  "Tools that help verify AI-generated code actually does what it's supposed to",
-  "Security problems with npm packages, especially ones AI tools install automatically",
-  "How AI is changing the day-to-day work of software engineers"
+  "Frontend performance optimization and Core Web Vitals",
+  "New open source developer tools, especially CLI tools",
+  "Security vulnerabilities in popular npm packages"
 ]
 ```
 
-A local AI model (Ollama, runs on your machine) reads each post and decides if it matches. If yes, it summarizes the article and checks if the comments have anything interesting.
+A local AI model (running on your machine through Ollama) reads each post and decides if it matches your interests. If yes, it summarizes the article and checks the comments for anything interesting.
 
 ## Setup
 
-Node.js 18+ and [Ollama](https://ollama.com).
+You need **Node.js 18+** and **[Ollama](https://ollama.com)**.
 
 ```bash
 git clone https://github.com/krzysztofdudek/Huginn.git
@@ -60,47 +60,53 @@ ollama pull qwen3.5:9b
 
 cp config.example.json config.json
 cp secrets.example.json secrets.json
-# edit config.json with your interests
-# edit secrets.json with your Telegram bot token (see below)
-
-npm test    # checks if everything connects
-npm start   # go
 ```
 
-### Telegram bot (2 min)
+Now edit two files:
 
-1. Open Telegram, find @BotFather, type `/newbot`, follow steps, get a token
-2. Send your new bot any message
-3. Open `https://api.telegram.org/botYOUR_TOKEN/getUpdates` in browser, find your chat ID
-4. Put both in `secrets.json`
+1. **`config.json`** — write your interests. This is the most important part. Everything else has sensible defaults.
+2. **`secrets.json`** — add your Telegram bot token so it can send you messages. (See below for how to get one. If you skip this, everything saves as local files instead.)
 
-Skip this and everything just saves as local files instead.
+Then:
 
-### GitHub token (optional)
+```bash
+npm test    # checks that Ollama, Telegram, and all sources are reachable
+npm start   # starts collecting, analyzing, and delivering
+```
 
-Without it: 60 API requests/hour. With it: 5,000. For most people 60 is fine.
+### Getting a Telegram bot token (2 minutes)
 
-GitHub > Settings > Developer settings > Fine-grained tokens > Public Repositories read-only.
+1. Open Telegram, find **@BotFather**, type `/newbot`, follow the steps. You'll get a token.
+2. Start a chat with your new bot (send it any message).
+3. Open `https://api.telegram.org/botYOUR_TOKEN/getUpdates` in your browser. Find `"chat":{"id": 123456}`. That number is your chat ID.
+4. Put both in `secrets.json`.
 
-## Config
+No Telegram? No problem. Set `"delivery": "file"` in config.json and everything saves as markdown files in `output/`.
 
-Two files:
+### Getting a GitHub token (optional)
 
-**`config.json`** (what to watch):
+Without a token: 60 API requests per hour. With one: 5,000. For most people 60 is enough.
 
-| Setting | What it does |
-|---------|-------------|
-| `startDate` | How far back on first run. `null` = today. `"2026-03-20"` = go back. |
-| `interests` | The main thing. Plain language, what matters to you. |
-| `tags` | Labels the classifier picks from. Match your vocabulary. |
-| `hnUsername` | Your HN username. Get notified on replies. |
-| `github.topics` | Topics to search for new repos. |
-| `github.watchRepos` | Your repos or repos you follow. Stars and releases. |
-| `reddit.subreddits` | Which subs to read. |
-| `ollama.model` | `qwen3.5:9b` recommended. `qwen3.5:4b` if RAM is tight. |
-| `delivery` | `"both"`, `"telegram"`, or `"file"`. |
+Go to GitHub > Settings > Developer settings > Fine-grained tokens > create one with "Public Repositories (read-only)".
 
-**`secrets.json`** (tokens, gitignored):
+## Configuration
+
+**`config.json`** controls what to watch and how:
+
+| Setting | What it does | Default |
+|---------|-------------|---------|
+| `startDate` | How far back to look on first run. `"2026-03-20"` means go back to that date. | `null` (starts from right now) |
+| `interests` | Plain language descriptions of what matters to you. The most important setting. | `[]` |
+| `tags` | Labels the classifier picks from when categorizing stories. | `[]` |
+| `hnUsername` | Your Hacker News username. Set it to get notified when someone replies to your comments. | `null` (skipped) |
+| `ollama.model` | Which local model to use. | `"qwen3.5:9b"` |
+| `github.topics` | GitHub topics to search for new repos. | `[]` (skipped) |
+| `github.watchRepos` | Repos to monitor for new releases and star changes. | `[]` (skipped) |
+| `reddit.subreddits` | Subreddits to read. | `[]` (skipped) |
+| `intelligence.briefingHoursUTC` | Hours (in UTC) when briefings are generated. | `[8, 20]` |
+| `delivery` | How to send you results. | `"file"` |
+
+**`secrets.json`** has your private tokens (never committed to git):
 
 ```json
 {
@@ -109,32 +115,36 @@ Two files:
 }
 ```
 
-Everything optional. No subreddits? Reddit skipped. No Telegram? Files only. Nothing crashes.
+Everything is optional. If you leave something out, that feature is simply skipped. Nothing crashes.
 
 ## Commands
 
 ```
-npm start                                  Collect, analyze, deliver, keep going
+npm start                                  Collect, analyze, deliver, then keep polling
 npm run once                               One cycle, then stop
-npm test                                   Check all connections
-npm run status                             What's in the database
-npm run briefing                           Force today's briefing now
-npm run trend                              Force this week's trend
-npm run reset                              Wipe analysis, keep data
-node src/index.js --backfill 2026-03-20    Go back and get older stuff
-node src/index.js --help                   All options
+npm test                                   Check that all services are reachable
+npm run status                             Show what's in the database
+npm run briefing                           Generate a briefing for everything since the last one
+npm run trend                              Generate this week's trend report
+npm run reset                              Delete all analysis results (keeps downloaded data)
+node src/index.js --backfill 2026-03-20    Go back and collect older data
+node src/index.js --help                   Show all options
 ```
 
-## How it handles downtime
+## Stopping and starting
 
-Ctrl+C anytime. Picks up where it left off. Didn't run for 3 days? Catches up and gives you 3 separate daily briefings when you restart. Ollama crashes? Data keeps collecting, analysis queues up. Telegram down? Saves to files, sends when it's back.
+Press Ctrl+C to stop. Start it again whenever. It picks up exactly where it left off.
 
-## What it creates
+If you don't run it for a few days, it catches up on the next start. Briefings are generated for the time you missed, covering everything from the last briefing to now.
+
+If Ollama crashes while it's running, data collection keeps going. Analysis queues up and processes when Ollama comes back. If Telegram is down, briefings save as files and send when it's reachable again.
+
+## Files
 
 ```
-data/db            Everything collected and analyzed
-data/huginn.log    What happened when
-output/            Briefings and alerts as markdown
+data/db              Database with everything collected and analyzed
+data/huginn.log      Log of what the app did and when
+output/              Briefings and alerts as readable markdown files
 ```
 
 ## License
