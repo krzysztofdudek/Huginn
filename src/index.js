@@ -21,7 +21,7 @@ function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
 
 function parseArgs() {
   const args = process.argv.slice(2);
-  const result = { reset: false, briefing: false, trend: false, once: false, help: false, test: false, status: false };
+  const result = { reset: false, briefing: false, trend: false, once: false, help: false, test: false, status: false, backfill: null };
   for (let i = 0; i < args.length; i++) {
     if (args[i] === "--reset") result.reset = true;
     if (args[i] === "--briefing") result.briefing = true;
@@ -30,6 +30,7 @@ function parseArgs() {
     if (args[i] === "--help" || args[i] === "-h") result.help = true;
     if (args[i] === "--test") result.test = true;
     if (args[i] === "--status") result.status = true;
+    if (args[i] === "--backfill" && args[i + 1]) { result.backfill = args[i + 1]; i++; }
   }
   return result;
 }
@@ -428,6 +429,7 @@ function showHelp() {
     node src/index.js --once       Single cycle: collect, analyze, deliver, then exit.
     node src/index.js --briefing   Force generate today's daily briefing.
     node src/index.js --trend      Force generate this week's trend report.
+    node src/index.js --backfill YYYY-MM-DD   Move cursor back to collect older data.
     node src/index.js --test        Check connectivity to all services.
     node src/index.js --status      Show database stats without running a cycle.
     node src/index.js --reset       Wipe all analysis. Raw data (stories, comments) is kept.
@@ -480,6 +482,22 @@ async function main() {
     logDone("Reset complete. Run again without --reset.");
     db.close();
     return;
+  }
+
+  // Backfill: move cursor back to a specific date
+  if (args.backfill) {
+    const ts = dateToTs(args.backfill);
+    const currentStory = db.getCursorInt("story");
+    if (currentStory && ts >= currentStory) {
+      logWarn(`Cursor is already at or before ${args.backfill}. Nothing to backfill.`);
+    } else {
+      db.setCursor("story", ts);
+      db.setCursor("comment", ts);
+      if (!db.getCursor("since_date") || ts < dateToTs(db.getCursor("since_date"))) {
+        db.setCursor("since_date", args.backfill);
+      }
+      logDone(`Cursor moved back to ${args.backfill}. Will collect from there on next cycle.`);
+    }
   }
 
   // Initialize start date if first run
