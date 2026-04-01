@@ -108,11 +108,9 @@ function spinnerStop(doneText) {
 
 async function collect() {
   const storyCursor = db.getCursorInt("story") || 0;
-  const commentCursor = db.getCursorInt("comment") || 0;
 
   try {
-    // HN Stories
-    // HN Stories
+    // HN Stories (Algolia)
     spinnerStart("HN: fetching stories...");
     const stories = await collector.collectStories(storyCursor, (_t, cur, tot, count) => {
       spinnerUpdate(`HN: ${count} stories (day ${cur}/${tot})`);
@@ -120,13 +118,7 @@ async function collect() {
     if (stories > 0) { spinnerStop(`HN: ${stories} stories`); }
     else { spinnerStop("HN: stories up to date"); }
 
-    // HN Comments
-    spinnerStart("HN: fetching comments...");
-    const cmts = await collector.collectComments(commentCursor, (_t, cur, tot, count) => {
-      spinnerUpdate(`HN: ${count} comments (day ${cur}/${tot})`);
-    });
-    if (cmts > 0) { spinnerStop(`HN: ${cmts} comments`); }
-    else { spinnerStop("HN: comments up to date"); }
+    // HN comments fetched later via Firebase deep fetch (after classify)
 
     // HN extras
     const myComments = await collector.collectMyComments();
@@ -552,7 +544,7 @@ async function main() {
       logWarn(`Cursor is already at or before ${args.backfill}. Nothing to backfill.`);
     } else {
       db.setCursor("story", ts);
-      db.setCursor("comment", ts);
+      // comment cursor removed — comments now via Firebase deep fetch
       if (!db.getCursor("since_date") || ts < dateToTs(db.getCursor("since_date"))) {
         db.setCursor("since_date", args.backfill);
       }
@@ -566,7 +558,7 @@ async function main() {
     const ts = startDate === "now" ? Math.floor(Date.now() / 1000) : dateToTs(startDate);
     const label = startDate === "now" ? "now" : startDate;
     db.setCursor("story", ts);
-    db.setCursor("comment", ts);
+    // comment cursor removed — comments now via Firebase deep fetch
     db.setCursor("since_date", label);
     db.setCursor("last_briefing_ts", ts);
     logDone(`First run. Collecting from ${label}.`);

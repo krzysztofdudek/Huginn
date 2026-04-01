@@ -98,25 +98,8 @@ async function collectStories(sinceTs, onProgress) {
   return total;
 }
 
-async function collectComments(sinceTs, onProgress) {
-  const now = Math.floor(Date.now() / 1000);
-  const windows = dayWindows(sinceTs, now);
-  let total = 0;
-
-  for (let i = 0; i < windows.length; i++) {
-    const w = windows[i];
-    if (onProgress) onProgress("comments", i + 1, windows.length, total);
-    const url = `${ALGOLIA}/search_by_date?tags=comment&numericFilters=created_at_i>${w.s},created_at_i<=${w.e}`;
-    await fetchAllPages(url, (hits) => {
-      const comments = hits.map(normalizeComment).filter((c) => c.story_id);
-      db.upsertComments(comments);
-      total += comments.length;
-    });
-  }
-
-  db.setCursor("comment", now);
-  return total;
-}
+// Comments are now fetched per-story via Firebase deep fetch (hn-deep-fetch.js)
+// Algolia comment bulk fetch removed — incomplete coverage, no scores, redundant.
 
 async function collectMyComments() {
   const username = config.hnUsername;
@@ -169,4 +152,4 @@ async function refreshRecentPoints() {
   return { fetched, matched, newlyQualified };
 }
 
-module.exports = { collectStories, collectComments, collectMyComments, refreshRecentPoints };
+module.exports = { collectStories, collectMyComments, refreshRecentPoints };
