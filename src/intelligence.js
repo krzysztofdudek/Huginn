@@ -104,10 +104,9 @@ async function generateBriefing(range) {
   const allStories = db.getRelevantStoriesInRange(from, to);
 
   // Prioritize: relevant first, then adjacent. Within each, by points.
-  // Limit to avoid overwhelming both LLM and user.
   const relevant = allStories.filter((s) => s.relevance === "relevant");
   const adjacent = allStories.filter((s) => s.relevance === "adjacent");
-  const stories = [...relevant, ...adjacent.slice(0, 30)]; // All relevant + top 30 adjacent
+  const stories = [...relevant, ...adjacent];
 
   if (stories.length === 0) {
     db.setCursor("last_briefing_ts", to);
