@@ -50,6 +50,16 @@ src/
 - `config.example.json` — template with placeholder values. Committed.
 - `secrets.example.json` — template with placeholder values. Committed.
 
+## Changelog and versioning
+
+**This repo uses a changelog. It is mandatory.**
+
+`CHANGELOG.md` lists every version with what changed. Every release gets an entry. No exceptions.
+
+**"Bump" means:** update the version in `package.json` AND add a new section to `CHANGELOG.md`. Both. Always together.
+
+Versioning: semver. Breaking changes = major. New features = minor. Fixes = patch.
+
 ## Change checklist
 
 **After ANY code change, check these:**
@@ -59,6 +69,7 @@ src/
 3. Does the README still match? If you changed commands, config fields, or setup steps, update README.md.
 4. Does `config.example.json` still cover all fields? If you added a new config option, add it with a sensible default and a comment-like description.
 5. Are there hardcoded personal references? No usernames, repo names, project names, or topics in source code. Everything comes from config.
+6. Does `CHANGELOG.md` have an entry for this change? If this is a release, bump `package.json` version too.
 
 ## How to add a new data source
 

@@ -4,41 +4,39 @@
   <img src="assets/demo.gif" alt="Huginn demo" width="800">
 </p>
 
-You work in tech. You have specific topics you need to stay on top of. Maybe it's AI coding tools. Maybe it's security. Maybe it's frontend frameworks. Whatever it is, keeping up is a full-time job you don't have time for.
+I got tired of checking Hacker News, Reddit, GitHub, and Arxiv every day just to see if someone posted something I should know about. 500+ posts a day, and maybe 10 of them actually matter to what I'm working on. I was either spending an hour scrolling or missing things that mattered.
 
-Every day, hundreds of posts appear on Hacker News. New projects pop up on GitHub. Reddit threads multiply. Research papers drop. You can't read all of it. So you miss things. A tool that solves your exact problem gets posted and you find it three weeks later. Someone asks a question you could have answered, but by the time you see it, the conversation is dead.
+So I built a thing that reads all of it for me, figures out what's relevant, and sends me one Telegram message in the morning. If something blows up during the day or someone writes a comment I should respond to, it tells me right away.
 
-Huginn fixes this. You tell it what you care about, in plain English. It reads everything, figures out what matters to you, and sends you one message a day with a summary and links. If something blows up or someone says something you should respond to, it tells you right away.
+It runs on your machine with a local AI model. Nothing goes to the cloud. You tell it what you care about in plain English and it does the rest.
 
-It runs on your computer. No cloud service. No subscription. No data leaves your machine except the Telegram messages it sends you.
+## What you get
 
-## What you actually get
+One message a day on Telegram. Summary of what happened, what's gaining traction, which conversations might be worth jumping into. Below that, every relevant link so you can click through.
 
-**One message every morning.** A summary of what happened yesterday in your areas. What's important, what's gaining traction, which conversations might be worth joining. Below that, links to every relevant story so you can click into anything that looks interesting.
-
-**Instant alerts when something happens:**
+Real-time pings when:
 - A post in your area suddenly takes off
-- Someone writes a comment you'd want to respond to
-- Someone replies to your Hacker News comment (HN doesn't tell you this on its own)
-- A new project launches that does something similar to what you're building
-- A GitHub repo you follow gets a new release or a spike in stars
+- Someone writes something you'd want to respond to
+- Someone replies to your HN comment (HN doesn't do notifications)
+- A new project shows up that's in your space
+- One of your GitHub repos gets a release or stars spike
 
-**A weekly trend report.** What topics grew this week, what faded, what new tools appeared.
+Weekly trend report. What topics grew, what faded, what launched.
 
-## Where it gets its information
+Everything also saves as markdown files locally if you want to search later.
 
-It pulls from four places:
+## Where it looks
 
-- **Hacker News** — stories, comments, and votes
-- **GitHub** — new repositories matching your topics, trending repos, releases on repos you follow
-- **Reddit** — posts from subreddits you pick
-- **Arxiv** — academic papers matching your search terms
+| Source | How |
+|--------|-----|
+| Hacker News | Algolia API (free, no auth) |
+| GitHub | API (free, optional token for higher limits) |
+| Reddit | RSS feeds (free, no auth) |
+| Arxiv | API (free, no auth) |
 
-All of these are free public APIs. No accounts needed (except an optional GitHub token if you want faster API access).
+## How it knows what you care about
 
-## How it decides what's relevant
-
-You write descriptions of your interests in plain language. For example:
+You describe it in `config.json`:
 
 ```json
 "interests": [
@@ -48,122 +46,97 @@ You write descriptions of your interests in plain language. For example:
 ]
 ```
 
-When a new post or repo comes in, a local AI model (running on your machine through Ollama) reads the title and content, compares it to your interests, and decides: relevant, somewhat related, or skip. Only the relevant stuff reaches you.
+A local AI model (Ollama, runs on your machine) reads each post and decides if it matches. If yes, it summarizes the article and checks if the comments have anything interesting.
 
-## Setup (5 minutes)
+## Setup
 
-You need two things installed: **Node.js** (version 18 or newer) and **Ollama** (a tool that runs AI models locally).
+Node.js 18+ and [Ollama](https://ollama.com).
 
 ```bash
-# Get the code
 git clone https://github.com/krzysztofdudek/Huginn.git
 cd Huginn
 npm install
-
-# Get an AI model (this downloads ~7GB, runs locally)
 ollama pull qwen3.5:9b
 
-# Create your config files from the templates
 cp config.example.json config.json
 cp secrets.example.json secrets.json
+# edit config.json with your interests
+# edit secrets.json with your Telegram bot token (see below)
 
-# Edit config.json — put in your interests (the most important part)
-# Edit secrets.json — put in your Telegram bot token (see below)
-
-# Check everything works
-npm test
-
-# Start it
-npm start
+npm test    # checks if everything connects
+npm start   # go
 ```
 
-That's it. It starts collecting, analyzing, and will send you your first briefing once it has a day's worth of data.
+### Telegram bot (2 min)
 
-### Setting up Telegram (2 minutes)
+1. Open Telegram, find @BotFather, type `/newbot`, follow steps, get a token
+2. Send your new bot any message
+3. Open `https://api.telegram.org/botYOUR_TOKEN/getUpdates` in browser, find your chat ID
+4. Put both in `secrets.json`
 
-This is how Huginn sends you messages. You need a Telegram bot:
+Skip this and everything just saves as local files instead.
 
-1. Open Telegram on your phone or computer
-2. Search for **@BotFather** and start a chat
-3. Type `/newbot` and follow the steps. It gives you a **token** (a long string of letters and numbers)
-4. Now open a chat with your new bot and send it any message (like "hello")
-5. Open this URL in a browser (replace YOUR_TOKEN with the actual token): `https://api.telegram.org/botYOUR_TOKEN/getUpdates`
-6. In the response, find `"chat":{"id": 123456}`. That number is your **chat ID**.
-7. Put the token and chat ID in `secrets.json`
+### GitHub token (optional)
 
-If you skip this step, Huginn still works. It just saves everything as local files instead of sending Telegram messages.
+Without it: 60 API requests/hour. With it: 5,000. For most people 60 is fine.
 
-### Setting up GitHub (optional, 1 minute)
+GitHub > Settings > Developer settings > Fine-grained tokens > Public Repositories read-only.
 
-Without this, Huginn can still search GitHub but is limited to 60 requests per hour. With a token, you get 5,000.
+## Config
 
-1. Go to GitHub > Settings > Developer settings > Fine-grained personal access tokens
-2. Create one with "Public Repositories (read-only)", no extra permissions
-3. Put it in `secrets.json`
+Two files:
 
-## Configuration
-
-Everything is in two files:
-
-**`config.json`** — what to watch and how:
+**`config.json`** (what to watch):
 
 | Setting | What it does |
 |---------|-------------|
-| `startDate` | How far back to look on first run. `null` means start from today. `"2026-03-20"` means go back to March 20. |
-| `interests` | **The most important setting.** Plain language descriptions of what matters to you. |
-| `tags` | Labels the system uses to categorize stories. Customize to match your vocabulary. |
-| `hnUsername` | Your Hacker News username. Set this to get notified when someone replies to your comments. |
-| `github.topics` | GitHub topics to search. Like `["ai-agents", "react", "security"]`. |
-| `github.watchRepos` | Repos you want to track. Like `["facebook/react", "your-name/your-project"]`. |
-| `reddit.subreddits` | Which subreddits to read. Like `["programming", "typescript"]`. |
-| `ollama.model` | Which AI model to use. `qwen3.5:9b` is recommended. `qwen3.5:4b` is faster but less accurate. |
-| `delivery` | `"both"` (Telegram + files), `"telegram"` (Telegram only), or `"file"` (files only, good for testing). |
+| `startDate` | How far back on first run. `null` = today. `"2026-03-20"` = go back. |
+| `interests` | The main thing. Plain language, what matters to you. |
+| `tags` | Labels the classifier picks from. Match your vocabulary. |
+| `hnUsername` | Your HN username. Get notified on replies. |
+| `github.topics` | Topics to search for new repos. |
+| `github.watchRepos` | Your repos or repos you follow. Stars and releases. |
+| `reddit.subreddits` | Which subs to read. |
+| `ollama.model` | `qwen3.5:9b` recommended. `qwen3.5:4b` if RAM is tight. |
+| `delivery` | `"both"`, `"telegram"`, or `"file"`. |
 
-**`secrets.json`** — your private tokens (never shared, never committed to git):
+**`secrets.json`** (tokens, gitignored):
 
 ```json
 {
-  "telegram": { "botToken": "your-token", "chatId": "your-chat-id" },
-  "github": { "token": "your-github-token" }
+  "telegram": { "botToken": "...", "chatId": "..." },
+  "github": { "token": "..." }
 }
 ```
 
-Everything is optional. Leave out what you don't need. No subreddits? Reddit is skipped. No GitHub token? GitHub works with lower limits. No Telegram token? Everything saves to local files.
+Everything optional. No subreddits? Reddit skipped. No Telegram? Files only. Nothing crashes.
 
 ## Commands
 
 ```
-npm start                                  Run normally (collect + analyze + deliver + keep polling)
-npm run once                               Run one cycle and stop (good for testing or cron jobs)
-npm test                                   Check if Ollama, Telegram, GitHub, Reddit, Arxiv are working
-npm run status                             See what's in the database without running anything
-npm run briefing                           Generate today's briefing right now
-npm run trend                              Generate this week's trend report right now
-npm run reset                              Start analysis over (keeps downloaded data)
-node src/index.js --backfill 2026-03-20    Go back and collect older data you missed
-node src/index.js --help                   Show all commands
+npm start                                  Collect, analyze, deliver, keep going
+npm run once                               One cycle, then stop
+npm test                                   Check all connections
+npm run status                             What's in the database
+npm run briefing                           Force today's briefing now
+npm run trend                              Force this week's trend
+npm run reset                              Wipe analysis, keep data
+node src/index.js --backfill 2026-03-20    Go back and get older stuff
+node src/index.js --help                   All options
 ```
 
-## Stopping and restarting
+## How it handles downtime
 
-Press **Ctrl+C** to stop. Run it again whenever you want. It remembers where it left off.
+Ctrl+C anytime. Picks up where it left off. Didn't run for 3 days? Catches up and gives you 3 separate daily briefings when you restart. Ollama crashes? Data keeps collecting, analysis queues up. Telegram down? Saves to files, sends when it's back.
 
-If you don't run it for a few days, it catches up automatically on the next start. You'll get separate daily briefings for each day you missed, not one big combined message.
-
-If Ollama crashes while it's running, data collection continues. Analysis queues up and processes when Ollama comes back. If Telegram goes down, briefings save as files and send when Telegram returns. Nothing breaks, nothing is lost.
-
-## Files it creates
+## What it creates
 
 ```
-data/db              The database. All collected stories, analysis results, everything.
-data/huginn.log  Log file. What the app did and when.
-output/              Briefings and alerts as markdown files (searchable archive).
+data/db            Everything collected and analyzed
+data/huginn.log    What happened when
+output/            Briefings and alerts as markdown
 ```
-
-## How it works under the hood
-
-For the curious: Huginn runs a loop. Each cycle: fetch new content from all sources, classify each item as relevant or not (using Ollama), summarize the relevant ones, analyze their comments for interesting discussions, check for rising stories and engagement opportunities, generate any due briefings, and deliver everything. Progress is saved to a SQLite database after each step, so it can resume from any point.
 
 ## License
 
-MIT — use it however you want.
+MIT
