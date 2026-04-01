@@ -58,13 +58,14 @@ function showLogo() {
   const d = "\x1b[2m";        // dim
 
   console.log("");
-  console.log("  " + o + " _   _                " + y + "__     ___     _             ");
-  console.log("  " + o + "| \\ | | _____      __ " + y + "\\ \\   / (_)___(_) ___  _ __  ");
-  console.log("  " + o + "|  \\| |/ _ \\ \\ /\\ / / " + y + " \\ \\ / /| / __| |/ _ \\| '_ \\ ");
-  console.log("  " + o + "| |\\  |  __/\\ V  V /  " + y + "  \\ V / | \\__ \\ | (_) | | | |");
-  console.log("  " + o + "|_| \\_|\\___| \\_/\\_/   " + y + "   \\_/  |_|___/_|\\___/|_| |_|" + r);
+  console.log("  " + o + " _   _             _            " + r);
+  console.log("  " + o + "| | | |_   _  __ _(_)_ __  _ __ " + r);
+  console.log("  " + o + "| |_| | | | |/ _` | | '_ \\| '_ \\" + r);
+  console.log("  " + o + "|  _  | |_| | (_| | | | | | | | |" + r);
+  console.log("  " + o + "|_| |_|\\__,_|\\__, |_|_| |_|_| |_|" + r);
+  console.log("  " + o + "             |___/               " + r);
   console.log("");
-  console.log("  " + d + "AI-powered intelligence feed \u2022 HN \u2022 GitHub \u2022 Reddit \u2022 Arxiv" + r);
+  console.log("  " + d + "Odin's raven sees everything \u2022 HN \u2022 GitHub \u2022 Reddit \u2022 Arxiv" + r);
   console.log("");
 }
 
@@ -306,7 +307,7 @@ async function runTest() {
   process.stdout.write("  GitHub API... ");
   const ghToken = config.github && config.github.token;
   try {
-    const headers = { "User-Agent": "NewsVision/1.0" };
+    const headers = { "User-Agent": "Huginn/1.0" };
     if (ghToken) headers["Authorization"] = "Bearer " + ghToken;
     const res = await fetch("https://api.github.com/rate_limit", { headers, signal: AbortSignal.timeout(10000) });
     if (res.ok) {
@@ -319,7 +320,7 @@ async function runTest() {
   // Reddit RSS
   process.stdout.write("  Reddit (RSS)... ");
   try {
-    const res = await fetch("https://www.reddit.com/r/programming/hot.rss?limit=1", { headers: { "User-Agent": "NewsVision/1.0" }, signal: AbortSignal.timeout(10000) });
+    const res = await fetch("https://www.reddit.com/r/programming/hot.rss?limit=1", { headers: { "User-Agent": "Huginn/1.0" }, signal: AbortSignal.timeout(10000) });
     if (res.ok) { console.log("\x1b[32mOK\x1b[0m"); }
     else { console.log("\x1b[31mFAILED\x1b[0m (" + res.status + ")"); ok = false; }
   } catch (e) { console.log("\x1b[31mFAILED\x1b[0m — " + e.message); ok = false; }
@@ -427,7 +428,7 @@ function printStats() {
 
 function showHelp() {
   console.log(`
-  \x1b[1mNewsVision\x1b[0m
+  \x1b[1mHuginn\x1b[0m
 
   Monitors Hacker News, GitHub, Reddit, and Arxiv for topics you care about.
   Sends you a daily summary on Telegram with links to everything relevant.
@@ -457,7 +458,7 @@ function showHelp() {
     config.json        What topics to follow, which sources to use, how to deliver
     secrets.json       Your Telegram and GitHub tokens (private, not shared)
     data/db            Everything the app has collected and analyzed
-    data/newsvision.log  What the app did and when
+    data/huginn.log  What the app did and when
     output/            Daily summaries and alerts saved as readable files
 `);
 }

@@ -2,7 +2,7 @@ const fs = require("fs");
 const path = require("path");
 
 const LOG_DIR = path.join(__dirname, "..", "data");
-const LOG_FILE = path.join(LOG_DIR, "newsvision.log");
+const LOG_FILE = path.join(LOG_DIR, "huginn.log");
 
 let logStream = null;
 

@@ -1,5 +1,5 @@
 {
-  "name": "newsvision",
+  "name": "huginn",
   "version": "1.0.0",
   "description": "AI-powered intelligence feed for Hacker News, GitHub, Reddit & Arxiv",
   "main": "src/index.js",

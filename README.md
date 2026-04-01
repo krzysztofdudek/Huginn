@@ -1,10 +1,10 @@
-# NewsVision
+# Huginn
 
 You work in tech. You have specific topics you need to stay on top of. Maybe it's AI coding tools. Maybe it's security. Maybe it's frontend frameworks. Whatever it is, keeping up is a full-time job you don't have time for.
 
 Every day, hundreds of posts appear on Hacker News. New projects pop up on GitHub. Reddit threads multiply. Research papers drop. You can't read all of it. So you miss things. A tool that solves your exact problem gets posted and you find it three weeks later. Someone asks a question you could have answered, but by the time you see it, the conversation is dead.
 
-NewsVision fixes this. You tell it what you care about, in plain English. It reads everything, figures out what matters to you, and sends you one message a day with a summary and links. If something blows up or someone says something you should respond to, it tells you right away.
+Huginn fixes this. You tell it what you care about, in plain English. It reads everything, figures out what matters to you, and sends you one message a day with a summary and links. If something blows up or someone says something you should respond to, it tells you right away.
 
 It runs on your computer. No cloud service. No subscription. No data leaves your machine except the Telegram messages it sends you.
 
@@ -52,8 +52,8 @@ You need two things installed: **Node.js** (version 18 or newer) and **Ollama** 
 
 ```bash
 # Get the code
-git clone https://github.com/krzysztofdudek/NewsVision.git
-cd NewsVision
+git clone https://github.com/krzysztofdudek/Huginn.git
+cd Huginn
 npm install
 
 # Get an AI model (this downloads ~7GB, runs locally)
@@ -77,7 +77,7 @@ That's it. It starts collecting, analyzing, and will send you your first briefin
 
 ### Setting up Telegram (2 minutes)
 
-This is how NewsVision sends you messages. You need a Telegram bot:
+This is how Huginn sends you messages. You need a Telegram bot:
 
 1. Open Telegram on your phone or computer
 2. Search for **@BotFather** and start a chat
@@ -87,11 +87,11 @@ This is how NewsVision sends you messages. You need a Telegram bot:
 6. In the response, find `"chat":{"id": 123456}`. That number is your **chat ID**.
 7. Put the token and chat ID in `secrets.json`
 
-If you skip this step, NewsVision still works. It just saves everything as local files instead of sending Telegram messages.
+If you skip this step, Huginn still works. It just saves everything as local files instead of sending Telegram messages.
 
 ### Setting up GitHub (optional, 1 minute)
 
-Without this, NewsVision can still search GitHub but is limited to 60 requests per hour. With a token, you get 5,000.
+Without this, Huginn can still search GitHub but is limited to 60 requests per hour. With a token, you get 5,000.
 
 1. Go to GitHub > Settings > Developer settings > Fine-grained personal access tokens
 2. Create one with "Public Repositories (read-only)", no extra permissions
@@ -152,13 +152,13 @@ If Ollama crashes while it's running, data collection continues. Analysis queues
 
 ```
 data/db              The database. All collected stories, analysis results, everything.
-data/newsvision.log  Log file. What the app did and when.
+data/huginn.log  Log file. What the app did and when.
 output/              Briefings and alerts as markdown files (searchable archive).
 ```
 
 ## How it works under the hood
 
-For the curious: NewsVision runs a loop. Each cycle: fetch new content from all sources, classify each item as relevant or not (using Ollama), summarize the relevant ones, analyze their comments for interesting discussions, check for rising stories and engagement opportunities, generate any due briefings, and deliver everything. Progress is saved to a SQLite database after each step, so it can resume from any point.
+For the curious: Huginn runs a loop. Each cycle: fetch new content from all sources, classify each item as relevant or not (using Ollama), summarize the relevant ones, analyze their comments for interesting discussions, check for rising stories and engagement opportunities, generate any due briefings, and deliver everything. Progress is saved to a SQLite database after each step, so it can resume from any point.
 
 ## License
 

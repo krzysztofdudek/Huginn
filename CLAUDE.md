@@ -1,8 +1,8 @@
-# NewsVision
+# Huginn
 
 ## What this project is
 
-NewsVision monitors Hacker News, GitHub, Reddit, and Arxiv for topics the user cares about. It collects posts, classifies them using a local AI model (Ollama), generates daily summaries, and sends alerts via Telegram. Everything runs locally, no cloud.
+Huginn monitors Hacker News, GitHub, Reddit, and Arxiv for topics the user cares about. It collects posts, classifies them using a local AI model (Ollama), generates daily summaries, and sends alerts via Telegram. Everything runs locally, no cloud.
 
 The user describes their interests in plain language in `config.json`. The system reads new content, decides what's relevant, and delivers a daily briefing plus real-time alerts.
 
@@ -24,7 +24,7 @@ All text that users see (README, CLI output, help text, error messages, Telegram
 src/
   index.js              Entry point. CLI argument parsing, the collect-analyze-deliver cycle, logo.
   config.js             Loads config.json + secrets.json, applies defaults, validates keys.
-  logger.js             Copies console output to data/newsvision.log.
+  logger.js             Copies console output to data/huginn.log.
   db.js                 SQLite: table creation, migrations, all database queries.
   ollama.js             Sends prompts to the local Ollama instance. Handles unavailability.
 
