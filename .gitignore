@@ -4,3 +4,4 @@ output/
 config.json
 secrets.json
 assets/frames/
+.DS_Store
