@@ -51,16 +51,21 @@ function dateToTs(s) {
   return Math.floor(d.getTime() / 1000);
 }
 
-const LOGO = `
-  \x1b[38;5;208m _  _                \x1b[38;5;214m_   _ _     _
- \x1b[38;5;208m| \\| |_____ __ ___  \x1b[38;5;214m| | | (_)___(_) ___ _ _
- \x1b[38;5;208m| .\` / -_) V  V (_-< \x1b[38;5;214m\\ V /| (_-<| |/ _ \\ ' \\
- \x1b[38;5;208m|_|\\_\\___|\_/\_//__/  \x1b[38;5;214m \\_/ |_/__/|_|\\___/_||_|\x1b[0m
-`;
-
 function showLogo() {
-  console.log(LOGO);
-  console.log("  \x1b[2mAI-powered intelligence feed \u2022 HN \u2022 GitHub \u2022 Reddit \u2022 Arxiv\x1b[0m\n");
+  const o = "\x1b[38;5;208m"; // orange
+  const y = "\x1b[38;5;214m"; // yellow
+  const r = "\x1b[0m";        // reset
+  const d = "\x1b[2m";        // dim
+
+  console.log("");
+  console.log("  " + o + " _   _                " + y + "__     ___     _             ");
+  console.log("  " + o + "| \\ | | _____      __ " + y + "\\ \\   / (_)___(_) ___  _ __  ");
+  console.log("  " + o + "|  \\| |/ _ \\ \\ /\\ / / " + y + " \\ \\ / /| / __| |/ _ \\| '_ \\ ");
+  console.log("  " + o + "| |\\  |  __/\\ V  V /  " + y + "  \\ V / | \\__ \\ | (_) | | | |");
+  console.log("  " + o + "|_| \\_|\\___| \\_/\\_/   " + y + "   \\_/  |_|___/_|\\___/|_| |_|" + r);
+  console.log("");
+  console.log("  " + d + "AI-powered intelligence feed \u2022 HN \u2022 GitHub \u2022 Reddit \u2022 Arxiv" + r);
+  console.log("");
 }
 
 function log(msg) { console.log(`  \x1b[2m${new Date().toLocaleTimeString()}\x1b[0m ${msg}`); }

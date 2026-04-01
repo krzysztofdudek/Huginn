@@ -6,6 +6,8 @@
   "scripts": {
     "start": "node src/index.js",
     "once": "node src/index.js --once",
+    "test": "node src/index.js --test",
+    "status": "node src/index.js --status",
     "briefing": "node src/index.js --briefing",
     "trend": "node src/index.js --trend",
     "reset": "node src/index.js --reset"

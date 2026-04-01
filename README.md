@@ -67,10 +67,10 @@ cp secrets.example.json secrets.json
 # Edit secrets.json — put in your Telegram bot token (see below)
 
 # Check everything works
-node src/index.js --test
+npm test
 
 # Start it
-node src/index.js
+npm start
 ```
 
 That's it. It starts collecting, analyzing, and will send you your first briefing once it has a day's worth of data.
@@ -129,14 +129,14 @@ Everything is optional. Leave out what you don't need. No subreddits? Reddit is 
 ## Commands
 
 ```
-node src/index.js                          Run normally (collect + analyze + deliver + keep polling)
-node src/index.js --once                   Run one cycle and stop (good for testing or cron jobs)
-node src/index.js --test                   Check if Ollama, Telegram, GitHub, Reddit, Arxiv are working
-node src/index.js --status                 See what's in the database without running anything
-node src/index.js --briefing               Generate today's briefing right now
-node src/index.js --trend                  Generate this week's trend report right now
+npm start                                  Run normally (collect + analyze + deliver + keep polling)
+npm run once                               Run one cycle and stop (good for testing or cron jobs)
+npm test                                   Check if Ollama, Telegram, GitHub, Reddit, Arxiv are working
+npm run status                             See what's in the database without running anything
+npm run briefing                           Generate today's briefing right now
+npm run trend                              Generate this week's trend report right now
+npm run reset                              Start analysis over (keeps downloaded data)
 node src/index.js --backfill 2026-03-20    Go back and collect older data you missed
-node src/index.js --reset                  Delete all analysis (keeps raw data, re-analyzes on next run)
 node src/index.js --help                   Show all commands
 ```
 
