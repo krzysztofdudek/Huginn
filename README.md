@@ -23,6 +23,18 @@ It runs on your machine with a local AI model. Nothing goes to the cloud. You te
 
 **Weekly trend report.** What topics grew, what faded, what launched.
 
+**Bot commands in Telegram.** You can talk to the bot directly:
+
+| Command | What it does |
+|---------|-------------|
+| `/huginn_help` | List all commands |
+| `/huginn_brief` | Generate a briefing right now |
+| `/huginn_status` | Show what's in the database |
+| `/huginn_links` | Resend links from the last briefing |
+| `/huginn_rising` | What's gaining traction right now |
+
+Commands register automatically when the app starts. Just type `/` in the chat to see them.
+
 Everything also saves as markdown files locally if you want to search later.
 
 ## Where it looks
