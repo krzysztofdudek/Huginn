@@ -112,26 +112,24 @@ async function deliverBriefing(id, content, storyCount, stories, fromLabel, toLa
   const fullMsg = header + body;
 
   if (fullMsg.length <= 4096) {
-    const sent1 = await sendTelegram(fullMsg);
-    if (!sent1) return false;
+    await sendTelegram(fullMsg);
   } else {
     // Split body into paragraphs and send in chunks
     const paragraphs = body.split("\n\n");
     let chunk = header;
     for (const p of paragraphs) {
       if (chunk.length + p.length + 2 > 3800) {
-        const sent = await sendTelegram(chunk);
-        if (!sent) return false;
+        await sendTelegram(chunk);
         await sleep(200);
         chunk = "";
       }
       chunk += (chunk ? "\n\n" : "") + p;
     }
     if (chunk.trim()) {
-      const sent = await sendTelegram(chunk);
-      if (!sent) return false;
+      await sendTelegram(chunk);
     }
   }
+  await sleep(200);
 
   // Message 2: Must read links
   if (mustRead.length > 0) {
