@@ -177,40 +177,44 @@ async function analyze() {
     let batch;
 
     // Classify stories
+    let classifyTotal = db.pendingCount("classify");
     let classified = 0;
-    spinnerStart("Classifying stories...");
+    spinnerStart(classifyTotal > 0 ? `Classifying stories... 0/${classifyTotal}` : "Classification up to date");
     while ((batch = await analyzer.processClassifyQueue(50)) > 0) {
       classified += batch;
-      spinnerUpdate(`Classifying stories... ${classified} done`);
+      spinnerUpdate(`Classifying stories... ${classified}/${classifyTotal}`);
     }
-    spinnerStop(`${classified > 0 ? classified + " stories classified" : "Classification up to date"}`);
+    spinnerStop(classified > 0 ? `${classified} stories classified` : "Classification up to date");
 
     // Summarize
+    let summarizeTotal = db.pendingCount("summarize");
     let summarized = 0;
-    spinnerStart("Summarizing articles...");
+    spinnerStart(summarizeTotal > 0 ? `Summarizing articles... 0/${summarizeTotal}` : "Summaries up to date");
     while ((batch = await analyzer.processSummarizeQueue(20)) > 0) {
       summarized += batch;
-      spinnerUpdate(`Summarizing articles... ${summarized} done`);
+      spinnerUpdate(`Summarizing articles... ${summarized}/${summarizeTotal}`);
     }
-    spinnerStop(`${summarized > 0 ? summarized + " articles summarized" : "Summaries up to date"}`);
+    spinnerStop(summarized > 0 ? `${summarized} articles summarized` : "Summaries up to date");
 
     // Comments
+    let commentsTotal = db.pendingCount("analyze_comments");
     let commentsDone = 0;
-    spinnerStart("Analyzing comments...");
+    spinnerStart(commentsTotal > 0 ? `Analyzing comments... 0/${commentsTotal} stories` : "Comments up to date");
     while ((batch = await comments.processCommentQueue(10)) > 0) {
       commentsDone += batch;
-      spinnerUpdate(`Analyzing comments... ${commentsDone} stories done`);
+      spinnerUpdate(`Analyzing comments... ${commentsDone}/${commentsTotal} stories`);
     }
-    spinnerStop(`${commentsDone > 0 ? commentsDone + " story comment batches analyzed" : "Comments up to date"}`);
+    spinnerStop(commentsDone > 0 ? `${commentsDone} story comment batches analyzed` : "Comments up to date");
 
     // GitHub repos
+    let reposTotal = db.pendingCount("classify_repo");
     let reposClassified = 0;
-    spinnerStart("Classifying GitHub repos...");
+    spinnerStart(reposTotal > 0 ? `Classifying GitHub repos... 0/${reposTotal}` : "Repos up to date");
     while ((batch = await githubAnalyzer.processClassifyRepoQueue(50)) > 0) {
       reposClassified += batch;
-      spinnerUpdate(`Classifying GitHub repos... ${reposClassified} done`);
+      spinnerUpdate(`Classifying GitHub repos... ${reposClassified}/${reposTotal}`);
     }
-    spinnerStop(`${reposClassified > 0 ? reposClassified + " repos classified" : "Repos up to date"}`);
+    spinnerStop(reposClassified > 0 ? `${reposClassified} repos classified` : "Repos up to date");
 
     people.rebuild();
 

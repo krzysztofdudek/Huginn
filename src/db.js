@@ -357,6 +357,10 @@ function enqueue(task, targetId, params) {
   `).run(task, String(targetId), params ? JSON.stringify(params) : null, Math.floor(Date.now() / 1000));
 }
 
+function pendingCount(task) {
+  return getDb().prepare("SELECT COUNT(*) as c FROM work_queue WHERE task = ? AND status = 'pending'").get(task).c;
+}
+
 function dequeueBatch(task, limit) {
   return getDb().prepare(`
     SELECT * FROM work_queue WHERE task = ? AND status = 'pending'
@@ -585,7 +589,7 @@ module.exports = {
   getAnalysis, setAnalysis, getRelevantStoriesInRange, getRelevantStoriesSince,
   getCommentAnalysis, setCommentAnalysisBatch, getOpportunitiesInRange, getFreshOpportunities, markOpportunityNotified,
   rebuildPeople, getTopPeople,
-  enqueue, dequeueBatch, completeWork, failWork, failWorkPermanent,
+  enqueue, pendingCount, dequeueBatch, completeWork, failWork, failWorkPermanent,
   getDelivery, saveDelivery, markDeliverySent, getUnsentDeliveries, getDeliveredDays,
   upsertMyComments, getMyCommentIds, getWatchedThreads, upsertWatchedThread, getNewReplies, setLastReplySeen,
   upsertGithubRepo, upsertGithubRepos, getGithubRepo, getGithubRepoByName,
