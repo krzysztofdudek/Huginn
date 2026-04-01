@@ -11,6 +11,7 @@ let lastUpdateId = 0;
 let polling = false;
 
 const COMMANDS = [
+  { command: "huginn_help", description: "Show available commands" },
   { command: "huginn_brief", description: "Generate a briefing now" },
   { command: "huginn_status", description: "Show what's in the database" },
   { command: "huginn_links", description: "Resend links from last briefing" },
@@ -208,13 +209,14 @@ async function processUpdates() {
       await handleLinks(msg.chat.id);
     } else if (cmd === "/huginn_rising") {
       await handleRising(msg.chat.id);
-    } else if (cmd === "/start" || cmd === "/help") {
+    } else if (cmd === "/huginn_help" || cmd === "/start") {
       await reply(msg.chat.id,
         `<b>Huginn</b> \u2014 your intelligence feed\n\n` +
         `/huginn_brief \u2014 Generate a briefing now\n` +
         `/huginn_status \u2014 Show what's in the database\n` +
         `/huginn_links \u2014 Resend links from last briefing\n` +
-        `/huginn_rising \u2014 What's gaining traction right now`
+        `/huginn_rising \u2014 What's gaining traction right now\n` +
+        `/huginn_help \u2014 Show this message`
       );
     }
   }
