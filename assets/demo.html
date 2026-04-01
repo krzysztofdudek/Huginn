@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #0d1117;
+    color: #e6edf3;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    overflow: hidden;
+  }
+
+  .container {
+    width: 900px;
+    height: 500px;
+    position: relative;
+  }
+
+  /* ── Phase 1: Problem (0-3.5s) ── */
+  .problem {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    animation: fadeInOut 3.5s ease forwards;
+  }
+
+  .problem .big {
+    font-size: 44px;
+    font-weight: 700;
+    color: #f0883e;
+    text-align: center;
+  }
+
+  .problem .sub {
+    font-size: 20px;
+    color: #8b949e;
+    margin-top: 10px;
+  }
+
+  /* ── Phase 2: Hook (3.5-7s) ── */
+  .hook {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    animation: fadeInOut 3s ease 3.8s forwards;
+  }
+
+  .hook .big {
+    font-size: 52px;
+    font-weight: 700;
+  }
+
+  .hook .sub {
+    font-size: 22px;
+    color: #f0883e;
+    margin-top: 8px;
+  }
+
+  /* ── Phase 3: Demo (7s - 15s) ── */
+  .demo {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    gap: 20px;
+    padding: 10px;
+    opacity: 0;
+    animation: fadeIn 0.6s ease 7.2s forwards, fadeOut 0.8s ease 15s forwards;
+  }
+
+  /* Left: Telegram phone */
+  .phone {
+    width: 420px;
+    flex-shrink: 0;
+    background: #1c2128;
+    border-radius: 20px;
+    border: 1.5px solid #30363d;
+    box-shadow: 0 16px 48px rgba(0,0,0,0.4);
+    padding: 14px;
+    overflow: hidden;
+  }
+
+  .phone-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #30363d;
+    margin-bottom: 10px;
+  }
+
+  .phone-avatar {
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    background: #f0883e;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px; font-weight: 700;
+  }
+
+  .phone-name { font-weight: 600; font-size: 14px; }
+  .phone-label { font-size: 11px; color: #8b949e; }
+
+  .msg {
+    background: #21262d;
+    border-radius: 10px;
+    padding: 10px 12px;
+    margin-bottom: 6px;
+    opacity: 0;
+  }
+
+  .msg-1 { animation: msgIn 0.3s ease 7.8s forwards; }
+  .msg-2 { animation: msgIn 0.3s ease 9.5s forwards; }
+
+  .msg-title { font-weight: 700; font-size: 13px; margin-bottom: 4px; color: #f0883e; }
+  .msg-section { font-weight: 600; font-size: 11px; color: #e6edf3; margin-top: 6px; margin-bottom: 2px; }
+  .msg-text { color: #8b949e; font-size: 11px; line-height: 1.5; }
+  .msg-pts { color: #f0883e; font-weight: 600; font-size: 11px; }
+  .msg-link { color: #58a6ff; font-size: 10px; }
+
+  /* Right: alerts */
+  .alerts {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding-top: 10px;
+  }
+
+  .alert-card {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 12px;
+    padding: 12px 14px;
+    opacity: 0;
+  }
+
+  .alert-1 { animation: slideIn 0.3s ease 11s forwards; }
+  .alert-2 { animation: slideIn 0.3s ease 12s forwards; }
+  .alert-3 { animation: slideIn 0.3s ease 13s forwards; }
+
+  .alert-icon { font-size: 14px; margin-right: 6px; }
+  .alert-title { font-weight: 600; font-size: 13px; }
+  .alert-detail { color: #8b949e; font-size: 11px; margin-top: 4px; line-height: 1.4; }
+
+  /* ── Phase 4: CTA (15.5s+) ── */
+  .cta {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    animation: fadeIn 0.8s ease 16s forwards;
+  }
+
+  .cta-logo {
+    font-size: 42px;
+    font-weight: 700;
+    color: #f0883e;
+    letter-spacing: 1px;
+  }
+
+  .cta-tagline {
+    font-size: 16px;
+    color: #8b949e;
+    margin-top: 4px;
+    margin-bottom: 20px;
+  }
+
+  .cta-cmd {
+    font-family: 'SF Mono', 'Cascadia Code', Consolas, monospace;
+    font-size: 20px;
+    color: #7ee787;
+    background: #161b22;
+    padding: 12px 28px;
+    border-radius: 10px;
+    border: 1px solid #30363d;
+  }
+
+  .cta-sub {
+    color: #8b949e;
+    font-size: 14px;
+    margin-top: 16px;
+    letter-spacing: 0.5px;
+  }
+
+  /* ── Keyframes ── */
+  @keyframes fadeInOut {
+    0% { opacity: 0; transform: translateY(10px); }
+    15% { opacity: 1; transform: translateY(0); }
+    82% { opacity: 1; }
+    100% { opacity: 0; }
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  @keyframes fadeOut {
+    from { opacity: 1; }
+    to { opacity: 0; }
+  }
+
+  @keyframes msgIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateX(15px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Phase 1: Problem -->
+  <div class="problem">
+    <div class="big">500+ posts per day</div>
+    <div class="sub">across Hacker News, GitHub, Reddit, and Arxiv</div>
+  </div>
+
+  <!-- Phase 2: Hook -->
+  <div class="hook">
+    <div class="big">You have 5 minutes.</div>
+    <div class="sub">What did you miss today?</div>
+  </div>
+
+  <!-- Phase 3: Demo -->
+  <div class="demo">
+
+    <!-- Left: Telegram -->
+    <div class="phone">
+      <div class="phone-header">
+        <div class="phone-avatar">H</div>
+        <div>
+          <div class="phone-name">Huginn</div>
+          <div class="phone-label">Daily Briefing</div>
+        </div>
+      </div>
+
+      <div class="msg msg-1">
+        <div class="msg-title">📋 Daily Briefing — 2026-03-31</div>
+        <div class="msg-section">What happened</div>
+        <div class="msg-text">Claude Code source leaked via NPM map file, exposing internal features and triggering clean-room rewrites. Axios compromised by state-sponsored actor via stolen credentials. Token costs spiking 10-20x due to cache bugs.</div>
+        <div class="msg-section">Worth joining</div>
+        <div class="msg-text">"LLM generated logic being tested by LLM generated tests. Everyone goes overboard with the suite..."</div>
+      </div>
+
+      <div class="msg msg-2">
+        <div class="msg-title">📌 Must read</div>
+        <div><span class="msg-pts">1990pts</span> <span class="msg-text">Claude Code source leaked via NPM</span></div>
+        <div><span class="msg-pts">1826pts</span> <span class="msg-text">Axios compromised — malicious versions</span></div>
+        <div><span class="msg-pts">1184pts</span> <span class="msg-text">The leak: fake tools, frustration regexes</span></div>
+        <div style="margin-top:4px"><span class="msg-link">+ 54 more relevant stories with links →</span></div>
+      </div>
+    </div>
+
+    <!-- Right: Alerts -->
+    <div class="alerts">
+      <div class="alert-card alert-1">
+        <span class="alert-icon">📈</span>
+        <span class="alert-title">Rising</span>
+        <div class="alert-detail">Claude Code Unpacked<br>408 → 478 pts (+70) in 6 hours</div>
+      </div>
+      <div class="alert-card alert-2">
+        <span class="alert-icon">💡</span>
+        <span class="alert-title">Join this conversation</span>
+        <div class="alert-detail">"We've moved from 'move fast and break things' to 'hallucinate fast and patch later'"</div>
+      </div>
+      <div class="alert-card alert-3">
+        <span class="alert-icon">💬</span>
+        <span class="alert-title">Reply to your comment</span>
+        <div class="alert-detail">user123 replied in<br>"Spec-driven development hits Technology Radar"</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Phase 4: CTA -->
+  <div class="cta">
+    <div class="cta-logo">Huginn</div>
+    <div class="cta-tagline">Odin's raven sees everything</div>
+    <div class="cta-cmd">npm start</div>
+    <div class="cta-sub">Local AI · No cloud · Your machine, your data</div>
+  </div>
+
+</div>
+</body>
+</html>

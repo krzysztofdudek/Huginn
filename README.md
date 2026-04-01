@@ -1,5 +1,9 @@
 # Huginn
 
+<p align="center">
+  <img src="assets/demo.gif" alt="Huginn demo" width="800">
+</p>
+
 You work in tech. You have specific topics you need to stay on top of. Maybe it's AI coding tools. Maybe it's security. Maybe it's frontend frameworks. Whatever it is, keeping up is a full-time job you don't have time for.
 
 Every day, hundreds of posts appear on Hacker News. New projects pop up on GitHub. Reddit threads multiply. Research papers drop. You can't read all of it. So you miss things. A tool that solves your exact problem gets posted and you find it three weeks later. Someone asks a question you could have answered, but by the time you see it, the conversation is dead.
