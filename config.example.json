@@ -1,0 +1,39 @@
+{
+  "startDate": null,
+  "hnUsername": null,
+  "ollama": {
+    "url": "http://localhost:11434",
+    "model": "qwen3.5:9b"
+  },
+  "github": {
+    "pollMinutes": 60,
+    "topics": ["ai-agents", "ai-coding"],
+    "watchRepos": []
+  },
+  "reddit": {
+    "subreddits": ["programming", "ExperiencedDevs"],
+    "pollMinutes": 10
+  },
+  "collector": {
+    "minPoints": 5,
+    "pollSeconds": 60,
+    "refreshRecentHours": 48
+  },
+  "analyzer": {
+    "conversationScoreThreshold": 0.4,
+    "maxCommentsPerStory": 15
+  },
+  "intelligence": {
+    "rising": { "minGrowth": 20, "windowHours": 6 },
+    "askHnAlert": { "minPoints": 10 },
+    "competitive": { "checkGithub": true }
+  },
+  "delivery": "file",
+  "interests": [
+    "Your first area of interest — describe in plain language what topics matter to you",
+    "Your second area of interest — be specific about what counts and what doesn't"
+  ],
+  "tags": [
+    "tag-one", "tag-two", "tag-three"
+  ]
+}

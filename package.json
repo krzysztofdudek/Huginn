@@ -1,0 +1,21 @@
+{
+  "name": "newsvision",
+  "version": "1.0.0",
+  "description": "AI-powered intelligence feed for Hacker News, GitHub, Reddit & Arxiv",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "once": "node src/index.js --once",
+    "briefing": "node src/index.js --briefing",
+    "trend": "node src/index.js --trend",
+    "reset": "node src/index.js --reset"
+  },
+  "keywords": ["hacker-news", "github", "reddit", "arxiv", "ai", "intelligence", "telegram", "ollama"],
+  "author": "Krzysztof Dudek",
+  "license": "MIT",
+  "type": "commonjs",
+  "dependencies": {
+    "@extractus/article-extractor": "^8.0.20",
+    "better-sqlite3": "^12.8.0"
+  }
+}
