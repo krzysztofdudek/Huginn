@@ -80,58 +80,62 @@ function logWarn(msg) { console.log(`  \x1b[33m!\x1b[0m ${msg}`); }
 async function collect() {
   const storyCursor = db.getCursorInt("story") || 0;
   const commentCursor = db.getCursorInt("comment") || 0;
+  const results = [];
 
   try {
-    const stories = await collector.collectStories(storyCursor, (type, cur, tot, count) => {
-      process.stdout.write(`\r  ${type}: ${count} (day ${cur}/${tot})`);
+    // HN Stories
+    const stories = await collector.collectStories(storyCursor, (_t, cur, tot, count) => {
+      process.stdout.write(`\r  HN stories: ${count} (day ${cur}/${tot})    `);
     });
-    if (stories > 0) process.stdout.write("\n");
+    if (stories > 0) { process.stdout.write("\n"); results.push(`HN: ${stories} stories`); }
 
-    const cmts = await collector.collectComments(commentCursor, (type, cur, tot, count) => {
-      process.stdout.write(`\r  ${type}: ${count} (day ${cur}/${tot})`);
+    // HN Comments
+    const cmts = await collector.collectComments(commentCursor, (_t, cur, tot, count) => {
+      process.stdout.write(`\r  HN comments: ${count} (day ${cur}/${tot})    `);
     });
-    if (cmts > 0) process.stdout.write("\n");
+    if (cmts > 0) { process.stdout.write("\n"); results.push(`${cmts} comments`); }
 
+    // HN My Comments
     const myComments = await collector.collectMyComments();
+    if (myComments > 0) results.push(`${myComments} my comments`);
 
+    // HN Point Refresh
     const refreshed = await collector.refreshRecentPoints();
+    if (refreshed > 0) results.push(`${refreshed} refreshed`);
 
     // GitHub
-    let github = { discovered: 0, trending: 0, watched: { updated: 0, releases: 0 } };
     const lastGhDiscovery = db.getCursorInt("github_discovery") || 0;
     const ghInterval = (config.github && config.github.pollMinutes || 60) * 60;
     if (Math.floor(Date.now() / 1000) - lastGhDiscovery >= ghInterval) {
-      log("  GitHub collecting...");
-      github = await githubCollector.collect();
-      if (github.discovered > 0 || github.trending > 0) {
-        log(`    +${github.discovered} discovered, +${github.trending} trending, ${github.watched.updated} watched, ${github.watched.releases} releases`);
-      }
+      const github = await githubCollector.collect();
+      const ghParts = [];
+      if (github.discovered > 0) ghParts.push(`${github.discovered} discovered`);
+      if (github.trending > 0) ghParts.push(`${github.trending} trending`);
+      if (github.watched.updated > 0) ghParts.push(`${github.watched.updated} watched`);
+      if (github.watched.releases > 0) ghParts.push(`${github.watched.releases} releases`);
+      if (ghParts.length > 0) results.push(`GitHub: ${ghParts.join(", ")}`);
     }
 
     // Reddit
-    let reddit = { posts: 0, comments: 0 };
     try {
-      log("  Reddit collecting...");
-      reddit = await redditCollector.collect();
-      if (reddit.posts > 0) log(`    +${reddit.posts} posts, +${reddit.comments} comments`);
-    } catch (err) {
-      console.error(`  Reddit error: ${err.message}`);
-    }
+      const reddit = await redditCollector.collect();
+      if (reddit.posts > 0) results.push(`Reddit: ${reddit.posts} posts`);
+    } catch (err) { logWarn(`Reddit: ${err.message}`); }
 
     // Arxiv
-    let arxiv = { papers: 0 };
     try {
-      log("  Arxiv collecting...");
-      arxiv = await arxivCollector.collect();
-      if (arxiv.papers > 0) log(`    +${arxiv.papers} papers`);
-    } catch (err) {
-      console.error(`  Arxiv error: ${err.message}`);
+      const arxiv = await arxivCollector.collect();
+      if (arxiv.papers > 0) results.push(`Arxiv: ${arxiv.papers} papers`);
+    } catch (err) { logWarn(`Arxiv: ${err.message}`); }
+
+    if (results.length > 0) {
+      for (const r of results) logDone(r);
+    } else {
+      log("No new data.");
     }
 
-    return { stories, comments: cmts, myComments, refreshed, github, reddit, arxiv };
   } catch (err) {
-    console.error(`  Collect error: ${err.message}`);
-    return { stories: 0, comments: 0, myComments: 0, refreshed: 0, github: {}, reddit: {}, arxiv: {} };
+    logWarn(`Collect error: ${err.message}`);
   }
 }
 
@@ -140,46 +144,51 @@ async function collect() {
 async function analyze() {
   if (!ollama.isAvailable()) {
     const ok = await ollama.check();
-    if (!ok) { log("Ollama unavailable, skipping analysis"); return {}; }
+    if (!ok) { logWarn("Ollama unavailable. Analysis queued for later."); return; }
   }
 
   try {
-    // Drain ALL queues before intelligence runs
-    let classified = 0, summarized = 0, commentsDone = 0;
     let batch;
+    const results = [];
 
-    // Classify all pending
+    // Classify stories
+    let classified = 0;
     while ((batch = await analyzer.processClassifyQueue(100)) > 0) {
       classified += batch;
-      process.stdout.write(`\r  Classified: ${classified}`);
+      process.stdout.write(`\r  Classifying stories: ${classified}    `);
     }
-    if (classified > 0) process.stdout.write("\n");
+    if (classified > 0) { process.stdout.write("\n"); results.push(`${classified} classified`); }
 
-    // Summarize all pending
+    // Summarize
+    let summarized = 0;
     while ((batch = await analyzer.processSummarizeQueue(50)) > 0) {
       summarized += batch;
-      process.stdout.write(`\r  Summarized: ${summarized}`);
+      process.stdout.write(`\r  Summarizing articles: ${summarized}    `);
     }
-    if (summarized > 0) process.stdout.write("\n");
+    if (summarized > 0) { process.stdout.write("\n"); results.push(`${summarized} summarized`); }
 
-    // Analyze comments all pending
+    // Comments
+    let commentsDone = 0;
     while ((batch = await comments.processCommentQueue(20)) > 0) {
       commentsDone += batch;
     }
+    if (commentsDone > 0) results.push(`${commentsDone} comment batches`);
 
     // GitHub repos
     let reposClassified = 0;
     while ((batch = await githubAnalyzer.processClassifyRepoQueue(50)) > 0) {
       reposClassified += batch;
-      process.stdout.write(`\r  GitHub repos classified: ${reposClassified}`);
+      process.stdout.write(`\r  Classifying repos: ${reposClassified}    `);
     }
-    if (reposClassified > 0) process.stdout.write("\n");
+    if (reposClassified > 0) { process.stdout.write("\n"); results.push(`${reposClassified} repos classified`); }
 
     people.rebuild();
-    return { classified, summarized, commentsDone, reposClassified };
+
+    if (results.length > 0) logDone(results.join(", "));
+    else log("Nothing to analyze.");
+
   } catch (err) {
-    console.error(`  Analyze error: ${err.message}`);
-    return {};
+    logWarn(`Analyze error: ${err.message}`);
   }
 }
 
@@ -389,23 +398,15 @@ function showStatus() {
 // ── Main cycles ──
 
 async function fullCycle() {
-  log("Collecting...");
-  const collected = await collect();
-  if (collected.stories > 0 || collected.comments > 0) {
-    log(`  +${collected.stories} stories, +${collected.comments} comments, +${collected.myComments} my comments, ${collected.refreshed} refreshed`);
-  }
+  logPhase("Collecting");
+  await collect();
 
-  log("Analyzing...");
-  const analyzed = await analyze();
-  if (analyzed.classified || analyzed.summarized || analyzed.reposClassified) {
-    log(`  HN: ${analyzed.classified || 0} classified, ${analyzed.summarized || 0} summarized, ${analyzed.commentsDone || 0} comment batches | GitHub: ${analyzed.reposClassified || 0} repos`);
-  }
+  logPhase("Analyzing");
+  await analyze();
 
-  log("Intelligence...");
+  logPhase("Intelligence");
   const actions = await runIntelligence();
-  if (actions.length > 0) {
-    log(`  Actions: ${actions.join(", ")}`);
-  }
+  if (actions.length === 0) log("Nothing to deliver.");
 }
 
 async function liveLoop() {
