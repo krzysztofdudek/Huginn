@@ -106,10 +106,32 @@ async function deliverBriefing(id, content, storyCount, stories, fromLabel, toLa
     return true;
   }
 
-  // Message 1: Briefing text
-  const briefingMsg = `\ud83d\udccb <b>Briefing</b> \u2014 ${escape(label)}\n${storyCount} relevant stories\n\n${markdownToTelegramHtml(content)}`;
-  const sent1 = await sendTelegram(briefingMsg);
-  if (!sent1) return false;
+  // Message 1: Briefing text (chunked if too long)
+  const header = `\ud83d\udccb <b>Briefing</b> \u2014 ${escape(label)}\n${storyCount} relevant stories\n\n`;
+  const body = markdownToTelegramHtml(content);
+  const fullMsg = header + body;
+
+  if (fullMsg.length <= 4096) {
+    const sent1 = await sendTelegram(fullMsg);
+    if (!sent1) return false;
+  } else {
+    // Split body into paragraphs and send in chunks
+    const paragraphs = body.split("\n\n");
+    let chunk = header;
+    for (const p of paragraphs) {
+      if (chunk.length + p.length + 2 > 3800) {
+        const sent = await sendTelegram(chunk);
+        if (!sent) return false;
+        await sleep(200);
+        chunk = "";
+      }
+      chunk += (chunk ? "\n\n" : "") + p;
+    }
+    if (chunk.trim()) {
+      const sent = await sendTelegram(chunk);
+      if (!sent) return false;
+    }
+  }
 
   // Message 2: Must read links
   if (mustRead.length > 0) {
