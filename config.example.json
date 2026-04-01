@@ -29,6 +29,7 @@
     "competitive": { "checkGithub": true },
     "briefingHoursUTC": [8, 20]
   },
+  "quietHoursUTC": [23, 7],
   "liveComments": true,
   "delivery": "file",
   "interests": [

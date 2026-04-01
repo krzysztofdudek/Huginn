@@ -116,6 +116,7 @@ Go to GitHub > Settings > Developer settings > Fine-grained tokens > create one 
 | `github.watchRepos` | Repos to monitor for new releases and star changes. | `[]` (skipped) |
 | `reddit.subreddits` | Subreddits to read. | `[]` (skipped) |
 | `intelligence.briefingHoursUTC` | Hours (in UTC) when briefings are generated. | `[8, 20]` |
+| `quietHoursUTC` | No Telegram notifications during these hours. Queued and sent grouped when quiet hours end. `[start, end]` in UTC. | `[23, 7]` (11pm to 7am) |
 | `liveComments` | Watch for new comments on relevant HN posts and alert when a conversation is worth joining. Uses more API calls and Ollama time. | `true` |
 | `delivery` | How to send you results. | `"file"` |
 

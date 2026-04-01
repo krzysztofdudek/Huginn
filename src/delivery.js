@@ -12,6 +12,18 @@ function escape(text) {
   return (text || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
+function isQuietHours() {
+  const hours = config.quietHoursUTC;
+  if (!hours || !Array.isArray(hours) || hours.length !== 2) return false;
+  const [start, end] = hours;
+  const now = new Date().getUTCHours();
+  if (start < end) {
+    return now >= start && now < end; // e.g. [23, 7] doesn't apply here
+  }
+  // Wraps midnight: [23, 7] means 23,0,1,2,3,4,5,6
+  return now >= start || now < end;
+}
+
 function markdownToTelegramHtml(text) {
   // Convert **bold** to <b>bold</b>, then escape the rest
   return escape(text).replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>");
@@ -22,6 +34,11 @@ function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
 // ── Telegram ──
 
 async function sendTelegram(text) {
+  // During quiet hours, queue to DB instead of sending
+  if (isQuietHours()) {
+    db.enqueueQuiet(text);
+    return true;
+  }
   try {
     const res = await fetch(`${API}/sendMessage`, {
       method: "POST",
@@ -273,7 +290,59 @@ async function deliverCompetitive(content, storyId) {
   return sendTelegram(`\ud83d\udd0d <b>Competitor</b>\n\n${markdownToTelegramHtml(content)}`);
 }
 
-// ── Flush unsent ──
+// ── Flush quiet queue (called when quiet hours end) ──
+
+async function flushQuietQueue() {
+  if (isQuietHours()) return 0;
+  const queued = db.getQuietQueue();
+  if (queued.length === 0) return 0;
+
+  let sent = 0;
+
+  if (queued.length <= 3) {
+    for (const item of queued) {
+      await sendTelegramDirect(item.message);
+      sent++;
+      await sleep(200);
+    }
+  } else {
+    const header = `\ud83c\udf19 <b>While you slept</b> (${queued.length} notifications)\n`;
+    let chunk = header;
+    for (const item of queued) {
+      const plain = item.message.replace(/<[^>]+>/g, "").replace(/\n{3,}/g, "\n\n").trim();
+      if (chunk.length + plain.length + 4 > 3800) {
+        await sendTelegramDirect(chunk);
+        sent++;
+        await sleep(200);
+        chunk = "";
+      }
+      chunk += (chunk ? "\n\n---\n\n" : "") + plain;
+    }
+    if (chunk.trim()) {
+      await sendTelegramDirect(chunk);
+      sent++;
+    }
+  }
+
+  db.clearQuietQueue();
+  return sent;
+}
+
+// Direct send bypassing quiet hours check (for flushing)
+async function sendTelegramDirect(text) {
+  if (!API) return false;
+  try {
+    const res = await fetch(`${API}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chat_id: config.telegram.chatId, text, parse_mode: "HTML", disable_web_page_preview: true }),
+      signal: AbortSignal.timeout(10000),
+    });
+    return res.ok;
+  } catch { return false; }
+}
+
+// ── Flush unsent deliveries ──
 
 async function flushUnsent() {
   const unsent = db.getUnsentDeliveries();
@@ -291,5 +360,5 @@ async function flushUnsent() {
 
 module.exports = {
   deliverBriefing, deliverWeekly, deliverRising, deliverOpportunity, deliverThreadReply, deliverStarChange, deliverRelease, deliverCompetitive,
-  flushUnsent, writeToFile,
+  flushUnsent, flushQuietQueue, isQuietHours, writeToFile,
 };

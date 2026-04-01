@@ -89,9 +89,9 @@ async function deepFetchStory(storyId) {
   return { allComments, newComments, updated: true };
 }
 
-async function deepFetchRelevantStories() {
+async function deepFetchRelevantStories(onProgress) {
   const now = Math.floor(Date.now() / 1000);
-  const allNewComments = []; // Collect deltas across all stories
+  const allNewComments = [];
 
   const stories = db.getDb().prepare(`
     SELECT s.id, s.title, s.num_comments, s.created_at, s.points,
@@ -105,7 +105,9 @@ async function deepFetchRelevantStories() {
   `).all();
 
   let totalComments = 0;
+  let totalNew = 0;
   let fetched = 0;
+  let checked = 0;
 
   for (const story of stories) {
     const age = now - story.created_at;
@@ -122,15 +124,18 @@ async function deepFetchRelevantStories() {
       interval = 24 * 3600;
     }
 
-    if (sinceFetch < interval) continue;
+    if (sinceFetch < interval) { checked++; continue; }
+
+    if (onProgress) onProgress({ phase: "fetching", story: story.title, fetched, total: stories.length, comments: totalComments, newComments: totalNew });
 
     const result = await deepFetchStory(story.id);
+    checked++;
     if (result.updated) {
       db.setCursor("deep_" + story.id, now);
       totalComments += result.allComments.length;
+      totalNew += result.newComments.length;
       if (result.allComments.length > 0) fetched++;
 
-      // Collect new comments with story context for live analysis
       for (const c of result.newComments) {
         allNewComments.push({ ...c, storyTitle: story.title, storyPoints: story.points });
       }

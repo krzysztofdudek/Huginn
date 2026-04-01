@@ -193,23 +193,33 @@ async function analyze() {
     spinnerStop(summarized > 0 ? `${summarized} articles summarized` : "Summaries up to date");
 
     // Deep fetch: get full comment trees with scores for relevant HN stories
-    spinnerStart("Fetching full comment trees for relevant stories...");
-    const deep = await hnDeep.deepFetchRelevantStories();
-    spinnerStop(deep.fetched > 0 ? `${deep.fetched} stories deep-fetched, ${deep.comments} comments with scores` : "Comment trees up to date");
+    if (config.liveComments !== false) {
+      spinnerStart("HN comments: checking relevant stories...");
+      const deep = await hnDeep.deepFetchRelevantStories((p) => {
+        spinnerUpdate(`HN comments: ${p.story.slice(0, 35)}... (${p.fetched} fetched, ${p.comments} comments, ${p.newComments} new)`);
+      });
 
-    // Live comment analysis: analyze DELTA (new comments only) from deep fetch
-    if (config.liveComments !== false && deep.newComments && deep.newComments.length > 0) {
-      spinnerStart(`Analyzing ${deep.newComments.length} new comments...`);
-      const liveOpportunities = await comments.analyzeNewComments(deep.newComments);
-      if (liveOpportunities.length > 0) {
-        spinnerStop(`${liveOpportunities.length} conversations worth joining`);
-        // Send alerts immediately
-        for (const opp of liveOpportunities) {
-          await delivery.deliverOpportunity(opp);
-          await sleep(200);
-        }
+      if (deep.fetched > 0) {
+        spinnerStop(`HN comments: ${deep.fetched} stories fetched, ${deep.comments} comments, ${deep.newComments.length} new`);
       } else {
-        spinnerStop("No new conversations to join");
+        spinnerStop("HN comments: up to date");
+      }
+
+      // Analyze new comments for conversations worth joining
+      if (deep.newComments && deep.newComments.length > 0) {
+        spinnerStart(`Analyzing ${deep.newComments.length} new comments for conversations...`);
+        const opportunities = await comments.analyzeNewComments(deep.newComments);
+
+        if (opportunities.length > 0) {
+          spinnerStop(`${opportunities.length} conversation(s) worth joining`);
+          for (const opp of opportunities) {
+            log(`  \ud83d\udca1 ${opp.story_title.slice(0, 40)} \u2014 ${opp.author}: ${opp.reason.slice(0, 60)}`);
+            await delivery.deliverOpportunity(opp);
+            await sleep(200);
+          }
+        } else {
+          spinnerStop("No new conversations to join");
+        }
       }
     }
 
@@ -302,6 +312,13 @@ async function runIntelligence() {
           await sleep(200);
         }
       }
+    }
+
+    // Flush quiet queue (notifications queued during night hours)
+    const quietFlushed = await delivery.flushQuietQueue();
+    if (quietFlushed > 0) {
+      log(`\ud83c\udf19 Sent ${quietFlushed} queued notification(s) from quiet hours`);
+      actions.push(`quiet:${quietFlushed}`);
     }
 
     // Flush any unsent deliveries (Telegram was down earlier)

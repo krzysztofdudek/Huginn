@@ -115,8 +115,16 @@ const MIGRATIONS = [
       CREATE INDEX IF NOT EXISTS idx_watched_threads_story ON watched_threads(story_id);
     `,
   },
+  {
+    version: 2,
+    name: "quiet_queue",
+    up: `CREATE TABLE IF NOT EXISTS quiet_queue (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      message TEXT NOT NULL,
+      created_at INTEGER NOT NULL
+    );`,
+  },
   // Future migrations go here:
-  // { version: 2, name: "add_something", up: "ALTER TABLE ..." },
 ];
 
 function migrate() {
@@ -558,6 +566,20 @@ function getAllGithubRepos() {
   return getDb().prepare("SELECT * FROM github_repos ORDER BY stars DESC").all();
 }
 
+// ── Quiet queue ──
+
+function enqueueQuiet(message) {
+  getDb().prepare("INSERT INTO quiet_queue (message, created_at) VALUES (?, ?)").run(message, Math.floor(Date.now() / 1000));
+}
+
+function getQuietQueue() {
+  return getDb().prepare("SELECT * FROM quiet_queue ORDER BY created_at ASC").all();
+}
+
+function clearQuietQueue() {
+  getDb().prepare("DELETE FROM quiet_queue").run();
+}
+
 // ── Stats ──
 
 function getStats() {
@@ -597,5 +619,6 @@ module.exports = {
   snapshotGithubStars, getGithubRising,
   upsertGithubRelease, getUnnotifiedReleases, markReleaseNotified,
   getRelevantGithubReposSince, getAllGithubRepos,
+  enqueueQuiet, getQuietQueue, clearQuietQueue,
   getStats, close,
 };
