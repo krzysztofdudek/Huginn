@@ -1,80 +1,100 @@
 # NewsVision
 
-## What this project does
+## What this project is
 
-NewsVision is a command-line tool that monitors Hacker News, GitHub, Reddit, and Arxiv for topics the user cares about. It collects posts and articles from these sources, uses a local AI model (via Ollama) to figure out which ones are relevant, generates daily summaries and real-time alerts, and delivers them through Telegram messages and local markdown files.
+NewsVision monitors Hacker News, GitHub, Reddit, and Arxiv for topics the user cares about. It collects posts, classifies them using a local AI model (Ollama), generates daily summaries, and sends alerts via Telegram. Everything runs locally, no cloud.
 
-The user configures their interests in plain language in `config.json`. The tool runs locally with no cloud dependencies beyond the source APIs.
+The user describes their interests in plain language in `config.json`. The system reads new content, decides what's relevant, and delivers a daily briefing plus real-time alerts.
 
-## How the code is organized
+## Tone and style rules
+
+All text that users see (README, CLI output, help text, error messages, Telegram messages) must follow these rules:
+
+- **Write for someone who has never heard of this tool.** No jargon from the codebase. No internal names. No assumptions about what they know.
+- **Start from the pain, show the result.** Don't describe features. Describe the problem the user has and how this solves it.
+- **Plain language.** "It checks if Ollama is running" not "It performs an availability probe against the Ollama inference endpoint." If a 15-year-old couldn't understand the sentence, rewrite it.
+- **Short sentences.** One idea per sentence. Break long explanations into steps.
+- **No marketing words.** No "powerful", "seamless", "robust", "cutting-edge", "next-generation." Just say what it does.
+- **Errors must say what to do.** Not "SQLITE_NOTADB". Instead: "Database file is corrupted. Delete data/db and restart to rebuild."
+- **CLI help must be complete.** Every command, what it does, one line each. A user should never need to read source code to understand a flag.
+
+## Code organization
 
 ```
 src/
-  index.js              Main entry point. Parses CLI args, runs the collect→analyze→deliver cycle.
-  config.js             Loads config.json, merges secrets.json, applies defaults, validates.
-  logger.js             Mirrors console output to data/newsvision.log.
-  db.js                 SQLite database: creates tables, handles migrations, provides all queries.
-  ollama.js             Talks to the local Ollama instance. Checks availability, sends prompts.
+  index.js              Entry point. CLI argument parsing, the collect-analyze-deliver cycle, logo.
+  config.js             Loads config.json + secrets.json, applies defaults, validates keys.
+  logger.js             Copies console output to data/newsvision.log.
+  db.js                 SQLite: table creation, migrations, all database queries.
+  ollama.js             Sends prompts to the local Ollama instance. Handles unavailability.
 
-  collector.js          Fetches HN stories and comments from Algolia API.
-  github-collector.js   Searches GitHub for repos by topic, checks trending, monitors watched repos.
-  reddit-collector.js   Reads Reddit posts via RSS feeds (no authentication needed).
-  arxiv-collector.js    Searches Arxiv for academic papers matching configured search terms.
+  collector.js          Fetches Hacker News stories and comments (Algolia API).
+  github-collector.js   Searches GitHub repos by topic, checks trending, monitors watched repos.
+  reddit-collector.js   Reads Reddit posts via RSS feeds.
+  arxiv-collector.js    Fetches academic papers from Arxiv.
 
-  analyzer.js           Classifies HN/Reddit/Arxiv items as relevant/adjacent/irrelevant.
-                        Summarizes articles by extracting content and sending to Ollama.
-  github-analyzer.js    Classifies GitHub repos the same way.
-  comments.js           Analyzes top comments on relevant stories. Flags insights, needs, opportunities.
-  people.js             Builds profiles of frequent commenters (SQL aggregation, no AI).
+  analyzer.js           Classifies stories as relevant/adjacent/irrelevant. Summarizes articles.
+  github-analyzer.js    Classifies GitHub repositories the same way.
+  comments.js           Analyzes comments on relevant stories for insights and engagement opportunities.
+  people.js             Builds profiles of frequent commenters (SQL only, no AI).
 
-  intelligence.js       Generates daily briefings, weekly trends, rising alerts, opportunity alerts,
-                        thread reply monitoring, GitHub watch alerts, competitive checks.
-  delivery.js           Formats and sends Telegram messages. Also writes markdown files to output/.
+  intelligence.js       Generates: daily briefings, weekly trends, rising alerts, opportunity alerts,
+                        thread reply detection, GitHub watch alerts, competitive checks.
+  delivery.js           Formats Telegram messages and writes markdown files.
 ```
 
-## Key files a developer would edit
+## Configuration files
 
-- **`config.json`** — All user-configurable behavior. Interests, tags, sources, thresholds. This is the main file users customize.
-- **`secrets.json`** — Telegram bot token and GitHub token. Not committed to git.
-- **`src/analyzer.js`** — Contains the Ollama prompts for classifying stories. Edit these to change how strictly things are filtered.
-- **`src/comments.js`** — Contains the prompt for analyzing comments. Controls what counts as an "insight" or "opportunity."
-- **`src/intelligence.js`** — Contains the prompt for generating daily briefings. Controls the format and length of summaries.
-- **`src/github-analyzer.js`** — Prompt for classifying GitHub repos.
+- `config.json` — all user settings (interests, sources, thresholds). Gitignored. Users copy from `config.example.json`.
+- `secrets.json` — Telegram token, GitHub token. Gitignored. Users copy from `secrets.example.json`.
+- `config.example.json` — template with placeholder values. Committed.
+- `secrets.example.json` — template with placeholder values. Committed.
+
+## Change checklist
+
+**After ANY code change, check these:**
+
+1. Does `--help` text still match the actual behavior? If you added a flag, renamed something, or changed a default, update the help text in `index.js`.
+2. Does `--test` still check all services the app uses? If you added a new data source, add a connectivity check.
+3. Does the README still match? If you changed commands, config fields, or setup steps, update README.md.
+4. Does `config.example.json` still cover all fields? If you added a new config option, add it with a sensible default and a comment-like description.
+5. Are there hardcoded personal references? No usernames, repo names, project names, or topics in source code. Everything comes from config.
 
 ## How to add a new data source
 
-1. Create `src/new-collector.js` with a `collect()` function that fetches data and stores it using `db.upsertStories()` or a new table
-2. Add any new tables to `src/db.js` in the `migrate()` function
-3. Add the collector to the collect phase in `src/index.js`
-4. Items stored as stories go through the existing classification pipeline automatically
+1. Create `src/new-collector.js` with a `collect()` function
+2. Store data using existing `db.upsertStories()` (for posts/articles) or add new tables in `db.js`
+3. Items stored as stories are automatically picked up by the classification pipeline
+4. Wire the collector into the collect phase in `index.js`
+5. Add a connectivity check to `--test` in `index.js`
+6. Update README, help text, and config.example.json
 
-## How to add a new type of alert
+## How to add a new alert type
 
-1. Add detection logic to `src/intelligence.js` (query the DB, check conditions)
-2. Add a delivery format to `src/delivery.js` (Telegram message + markdown file)
-3. Wire it into the intelligence phase in `src/index.js`
+1. Add detection logic in `intelligence.js`
+2. Add message formatting in `delivery.js`
+3. Wire into the intelligence phase in `index.js`
+4. Update README and help text
 
 ## Database
 
-Single SQLite file at `data/db`. Main tables:
+Single SQLite file at `data/db`. Key tables:
 
-- `stories` — posts from HN, Reddit, Arxiv (unified, with a `type` column to distinguish)
-- `comments` — HN comments
-- `story_analysis` — classification results (relevance, summary, tags)
-- `comment_analysis` — flagged comments (insight/need/opportunity)
-- `github_repos` — discovered GitHub repositories
-- `github_repo_analysis` — repo classification results
-- `work_queue` — retry-able async work items (classify, summarize, analyze comments)
-- `deliveries` — generated briefings and alerts, with sent/unsent tracking
-- `cursors` — progress tracking (timestamps for each collector and intelligence product)
-- `point_snapshots` — historical point values for rising detection
-- `people` — commenter profiles (aggregated from comment data)
+- `stories` — posts from all sources (HN, Reddit, Arxiv). Column `type` distinguishes them.
+- `comments` — discussion comments (currently HN only).
+- `story_analysis` — classification results per story (relevant/adjacent/irrelevant, summary, tags).
+- `comment_analysis` — flagged comments (insight, need, opportunity).
+- `github_repos` — discovered repositories.
+- `github_repo_analysis` — repo classification results.
+- `work_queue` — retryable work items. Failed tasks retry automatically next cycle.
+- `deliveries` — generated briefings and alerts with sent/unsent tracking.
+- `cursors` — progress tracking. Each collector and intelligence product has a cursor.
+- `point_snapshots` — historical vote counts for detecting rising content.
 
 ## Design principles
 
-1. **Everything is resumable.** The app can be stopped and restarted at any time. Progress is tracked by cursors in the database.
-2. **Everything degrades gracefully.** If Ollama is down, data still collects. If Telegram is down, briefings save to files. If GitHub API is exhausted, other sources keep working.
-3. **Retrospective processing.** If the app was off for a week, it generates 7 separate daily briefings on restart, not one combined summary.
-4. **Work queue with retry.** All AI processing (classification, summarization, comment analysis) goes through a queue. Failed items retry automatically on the next cycle.
-5. **No secrets in committed files.** `config.json` is safe to commit. `secrets.json` is gitignored.
-6. **Configuration is forgiving.** Missing fields get defaults. Empty arrays disable features. Nothing crashes on partial config.
+1. **Stop and restart anytime.** All progress is in the database. Nothing in memory.
+2. **If something fails, try again later.** Ollama down? Collect data, analyze when it's back. Telegram down? Save to file, send when it returns.
+3. **Catch up, don't skip.** Offline for a week? Generate 7 daily briefings, one per day, not a combined blob.
+4. **Missing config means skip, not crash.** No Reddit subreddits configured? Don't monitor Reddit. No Telegram token? Save to files. No GitHub token? Use lower API limits.
+5. **Secrets never in committed files.** Config.json has behavior. Secrets.json has tokens. Only secrets.json is gitignored... actually both are gitignored. Example files are committed.

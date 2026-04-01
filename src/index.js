@@ -422,35 +422,38 @@ function printStats() {
 
 function showHelp() {
   console.log(`
-  \x1b[1mNewsVision\x1b[0m — AI-powered intelligence feed
+  \x1b[1mNewsVision\x1b[0m
 
-  \x1b[1mUsage:\x1b[0m
-    node src/index.js              Start or resume. Collects, analyzes, delivers, then live polls.
-    node src/index.js --once       Single cycle: collect, analyze, deliver, then exit.
-    node src/index.js --briefing   Force generate today's daily briefing.
-    node src/index.js --trend      Force generate this week's trend report.
-    node src/index.js --backfill YYYY-MM-DD   Move cursor back to collect older data.
-    node src/index.js --test        Check connectivity to all services.
-    node src/index.js --status      Show database stats without running a cycle.
-    node src/index.js --reset       Wipe all analysis. Raw data (stories, comments) is kept.
-    node src/index.js --help        Show this help.
+  Monitors Hacker News, GitHub, Reddit, and Arxiv for topics you care about.
+  Sends you a daily summary on Telegram with links to everything relevant.
+  Alerts you in real-time when something important happens.
 
-  \x1b[1mFirst run:\x1b[0m
-    Set "startDate" in config.json (e.g. "2026-03-20") to load history.
-    If null, starts from today.
+  \x1b[1mCommands:\x1b[0m
 
-  \x1b[1mConfig:\x1b[0m
-    config.json        Interests, sources, thresholds, tags (committed to repo)
-    secrets.json       Telegram token, GitHub PAT (gitignored, see secrets.example.json)
+    node src/index.js                        Start collecting and analyzing. Runs continuously.
+    node src/index.js --once                 Do one full round of work, then stop.
+    node src/index.js --test                 Check if Ollama, Telegram, and all sources are reachable.
+    node src/index.js --status               Show what's in the database without doing any work.
+    node src/index.js --briefing             Make today's daily summary right now.
+    node src/index.js --trend                Make this week's trend report right now.
+    node src/index.js --backfill 2026-03-20  Go back in time and collect older posts you missed.
+    node src/index.js --reset                Start analysis over. Keeps all downloaded data.
+    node src/index.js --help                 Show this message.
 
-  \x1b[1mDelivery modes:\x1b[0m (config.json "delivery")
-    "both"             Telegram + markdown files in output/
-    "telegram"         Telegram only
-    "file"             Markdown files only (for testing)
+  \x1b[1mGetting started:\x1b[0m
 
-  \x1b[1mData:\x1b[0m
-    data/db         SQLite database (all collected data + analysis)
-    output/            Generated briefings, alerts, reports as markdown
+    1. Copy config.example.json to config.json and edit your interests
+    2. Copy secrets.example.json to secrets.json and add your Telegram token
+    3. Run --test to make sure everything connects
+    4. Run the app
+
+  \x1b[1mFiles:\x1b[0m
+
+    config.json        What topics to follow, which sources to use, how to deliver
+    secrets.json       Your Telegram and GitHub tokens (private, not shared)
+    data/db            Everything the app has collected and analyzed
+    data/newsvision.log  What the app did and when
+    output/            Daily summaries and alerts saved as readable files
 `);
 }
 

@@ -1,163 +1,165 @@
 # NewsVision
 
-There's too much happening in tech to follow manually. Every day, hundreds of stories appear on Hacker News, new repositories pop up on GitHub, Reddit threads multiply across subreddits, and research papers drop on Arxiv. If you're working in a specific area, like AI coding tools, you can't read all of it. You miss relevant discussions, find competitors weeks late, and lose chances to join conversations while they're still active.
+You work in tech. You have specific topics you need to stay on top of. Maybe it's AI coding tools. Maybe it's security. Maybe it's frontend frameworks. Whatever it is, keeping up is a full-time job you don't have time for.
 
-NewsVision solves this by reading everything for you. It collects posts from 4 sources, uses a local AI model to figure out what matters to your work, and sends you a summary on Telegram. One message per day with everything you need to know, plus real-time alerts when something important happens.
+Every day, hundreds of posts appear on Hacker News. New projects pop up on GitHub. Reddit threads multiply. Research papers drop. You can't read all of it. So you miss things. A tool that solves your exact problem gets posted and you find it three weeks later. Someone asks a question you could have answered, but by the time you see it, the conversation is dead.
 
-Everything runs on your machine. No cloud. No subscriptions. Your data stays local.
+NewsVision fixes this. You tell it what you care about, in plain English. It reads everything, figures out what matters to you, and sends you one message a day with a summary and links. If something blows up or someone says something you should respond to, it tells you right away.
 
-## What you get on Telegram
+It runs on your computer. No cloud service. No subscription. No data leaves your machine except the Telegram messages it sends you.
 
-**Every morning, one message:** a summary of what happened yesterday in your areas of interest. What's important, what's gaining traction, and which discussions you might want to join. Below the summary, a full list of links to every relevant story, so you can click through to anything that catches your eye.
+## What you actually get
 
-**Real-time alerts when:**
-- A post in your topic area suddenly gets a lot of attention (gaining 20+ points in a few hours)
-- Someone writes a comment that touches on a problem you could help with
-- Someone replies to one of your Hacker News comments (HN doesn't notify you about this natively)
-- A new project appears on "Show HN" that competes with or complements your work
-- One of your GitHub repositories gets a new release or a jump in stars
+**One message every morning.** A summary of what happened yesterday in your areas. What's important, what's gaining traction, which conversations might be worth joining. Below that, links to every relevant story so you can click into anything that looks interesting.
 
-**Once a week:** a short report on trends. Which topics came up more this week, which are fading, what new tools launched.
+**Instant alerts when something happens:**
+- A post in your area suddenly takes off
+- Someone writes a comment you'd want to respond to
+- Someone replies to your Hacker News comment (HN doesn't tell you this on its own)
+- A new project launches that does something similar to what you're building
+- A GitHub repo you follow gets a new release or a spike in stars
 
-Everything is also saved as markdown files locally, so you have a searchable archive.
+**A weekly trend report.** What topics grew this week, what faded, what new tools appeared.
 
-## What it monitors
+## Where it gets its information
 
-| Source | What it collects | How |
-|--------|-----------------|-----|
-| Hacker News | Stories, comments, points | Algolia API (free, no auth) |
-| GitHub | New repositories by topic, trending repos, releases on repos you follow | GitHub API (free, optional token for higher limits) |
-| Reddit | Posts from subreddits you choose | RSS feeds (free, no auth) |
-| Arxiv | Academic papers matching your search terms | Arxiv API (free, no auth) |
+It pulls from four places:
 
-## How classification works
+- **Hacker News** — stories, comments, and votes
+- **GitHub** — new repositories matching your topics, trending repos, releases on repos you follow
+- **Reddit** — posts from subreddits you pick
+- **Arxiv** — academic papers matching your search terms
 
-You describe what you care about in plain language (in `config.json`). For example:
+All of these are free public APIs. No accounts needed (except an optional GitHub token if you want faster API access).
+
+## How it decides what's relevant
+
+You write descriptions of your interests in plain language. For example:
 
 ```json
 "interests": [
-  "AI coding agents that verify generated code against specifications",
-  "Tools that enforce developer workflows mechanically, not through instructions",
-  "Supply chain attacks on npm packages"
+  "Tools that help verify AI-generated code actually does what it's supposed to",
+  "Security problems with npm packages, especially ones AI tools install automatically",
+  "How AI is changing the day-to-day work of software engineers"
 ]
 ```
 
-When a new story or repo comes in, the local AI model reads the title and summary and decides: is this **relevant** (directly about your topics), **adjacent** (related, worth knowing), or **irrelevant** (skip it). Only relevant and adjacent items make it into your briefing. The model runs locally through [Ollama](https://ollama.com), so nothing leaves your machine.
+When a new post or repo comes in, a local AI model (running on your machine through Ollama) reads the title and content, compares it to your interests, and decides: relevant, somewhat related, or skip. Only the relevant stuff reaches you.
 
-## Quick setup
+## Setup (5 minutes)
 
-You need: **Node.js 18+** and **[Ollama](https://ollama.com)** with a model installed.
+You need two things installed: **Node.js** (version 18 or newer) and **Ollama** (a tool that runs AI models locally).
 
 ```bash
-# 1. Clone and install
+# Get the code
 git clone https://github.com/krzysztofdudek/NewsVision.git
 cd NewsVision
 npm install
 
-# 2. Install an AI model (runs locally)
-ollama pull qwen3.5:9b    # recommended (needs ~7GB RAM)
-# or: ollama pull qwen3.5:4b  # lighter alternative (~4GB RAM)
+# Get an AI model (this downloads ~7GB, runs locally)
+ollama pull qwen3.5:9b
 
-# 3. Configure
+# Create your config files from the templates
 cp config.example.json config.json
 cp secrets.example.json secrets.json
-# Edit config.json — set your interests, tags, subreddits, GitHub topics
-# Edit secrets.json — add your Telegram bot token and (optional) GitHub PAT
 
-# 4. Test everything connects
+# Edit config.json — put in your interests (the most important part)
+# Edit secrets.json — put in your Telegram bot token (see below)
+
+# Check everything works
 node src/index.js --test
 
-# 5. Run
-node src/index.js            # collects data, processes it, then polls for new content
-node src/index.js --once     # runs one cycle and exits (good for cron jobs or testing)
+# Start it
+node src/index.js
 ```
 
-### How to get a Telegram bot token
+That's it. It starts collecting, analyzing, and will send you your first briefing once it has a day's worth of data.
 
-1. Open Telegram and message [@BotFather](https://t.me/BotFather)
-2. Send `/newbot`, follow the prompts, copy the token it gives you
-3. Start a chat with your new bot (just send it any message)
-4. Visit `https://api.telegram.org/bot<YOUR_TOKEN>/getUpdates` in a browser
-5. Find `"chat":{"id": 123456}` in the response. That number is your chat ID.
-6. Put both in `secrets.json`
+### Setting up Telegram (2 minutes)
 
-### How to get a GitHub token (optional)
+This is how NewsVision sends you messages. You need a Telegram bot:
 
-Without a token, GitHub allows 60 API requests per hour. With one, you get 5,000. For normal use, 60 is usually enough. If you want more:
+1. Open Telegram on your phone or computer
+2. Search for **@BotFather** and start a chat
+3. Type `/newbot` and follow the steps. It gives you a **token** (a long string of letters and numbers)
+4. Now open a chat with your new bot and send it any message (like "hello")
+5. Open this URL in a browser (replace YOUR_TOKEN with the actual token): `https://api.telegram.org/botYOUR_TOKEN/getUpdates`
+6. In the response, find `"chat":{"id": 123456}`. That number is your **chat ID**.
+7. Put the token and chat ID in `secrets.json`
+
+If you skip this step, NewsVision still works. It just saves everything as local files instead of sending Telegram messages.
+
+### Setting up GitHub (optional, 1 minute)
+
+Without this, NewsVision can still search GitHub but is limited to 60 requests per hour. With a token, you get 5,000.
 
 1. Go to GitHub > Settings > Developer settings > Fine-grained personal access tokens
-2. Create a token with "Public Repositories (read-only)" access, no extra permissions
+2. Create one with "Public Repositories (read-only)", no extra permissions
 3. Put it in `secrets.json`
 
 ## Configuration
 
-All behavior is controlled by two files:
+Everything is in two files:
 
-**`config.json`** — what to monitor and how (safe to commit, no secrets):
+**`config.json`** — what to watch and how:
 
-| Field | What it does | Default |
-|-------|-------------|---------|
-| `startDate` | How far back to collect on first run. Format: `"2026-03-20"`. | `null` (starts from today) |
-| `interests` | Plain language descriptions of topics you care about. This is the most important setting. | `[]` |
-| `tags` | A fixed list of labels the AI picks from when categorizing stories. | `[]` |
-| `hnUsername` | Your Hacker News username. If set, monitors replies to your comments. | `null` |
-| `ollama.model` | Which AI model to use. Bigger = better quality, slower. | `"qwen3.5:9b"` |
-| `github.topics` | GitHub topics to search for new repositories. | `[]` |
-| `github.watchRepos` | Repos to monitor for stars and releases (e.g., your own). | `[]` |
-| `reddit.subreddits` | Which subreddits to scan. | `[]` |
-| `delivery` | How to deliver results: `"both"`, `"telegram"`, or `"file"`. | `"file"` |
+| Setting | What it does |
+|---------|-------------|
+| `startDate` | How far back to look on first run. `null` means start from today. `"2026-03-20"` means go back to March 20. |
+| `interests` | **The most important setting.** Plain language descriptions of what matters to you. |
+| `tags` | Labels the system uses to categorize stories. Customize to match your vocabulary. |
+| `hnUsername` | Your Hacker News username. Set this to get notified when someone replies to your comments. |
+| `github.topics` | GitHub topics to search. Like `["ai-agents", "react", "security"]`. |
+| `github.watchRepos` | Repos you want to track. Like `["facebook/react", "your-name/your-project"]`. |
+| `reddit.subreddits` | Which subreddits to read. Like `["programming", "typescript"]`. |
+| `ollama.model` | Which AI model to use. `qwen3.5:9b` is recommended. `qwen3.5:4b` is faster but less accurate. |
+| `delivery` | `"both"` (Telegram + files), `"telegram"` (Telegram only), or `"file"` (files only, good for testing). |
 
-**`secrets.json`** — tokens and keys (gitignored, never committed):
+**`secrets.json`** — your private tokens (never shared, never committed to git):
 
 ```json
 {
-  "telegram": { "botToken": "...", "chatId": "..." },
-  "github": { "token": "..." }
+  "telegram": { "botToken": "your-token", "chatId": "your-chat-id" },
+  "github": { "token": "your-github-token" }
 }
 ```
 
-Every field in config.json is optional. If you leave `reddit.subreddits` empty, Reddit is simply skipped. If you don't set `hnUsername`, comment monitoring is skipped. Nothing crashes on missing configuration.
+Everything is optional. Leave out what you don't need. No subreddits? Reddit is skipped. No GitHub token? GitHub works with lower limits. No Telegram token? Everything saves to local files.
 
-## All commands
-
-```
-node src/index.js              Collect, analyze, deliver, then keep polling for new content.
-node src/index.js --once       Run one full cycle and exit. Good for cron or testing.
-node src/index.js --test       Check that Ollama, Telegram, GitHub, Reddit, Arxiv are reachable.
-node src/index.js --status     Show what's in the database without running a cycle.
-node src/index.js --briefing   Force-generate today's daily briefing.
-node src/index.js --trend      Force-generate this week's trend report.
-node src/index.js --reset      Delete all analysis results. Raw collected data is kept.
-node src/index.js --help       Show command help.
-```
-
-## How it works internally
+## Commands
 
 ```
-  Collect                  Analyze                    Deliver
-  ──────────              ──────────                 ─────────
-  HN stories    ──┐       Classify (relevant?)  ──┐  Daily briefing + links
-  HN comments   ──┤       Summarize articles    ──┤  Weekly trend report
-  GitHub repos  ──┼──→    Classify repos        ──┼──→  Rising alerts
-  Reddit posts  ──┤       Analyze comments      ──┤  Opportunity alerts
-  Arxiv papers  ──┘       Profile people        ──┘  Reply notifications
-                                                     Competitor checks
-                                                     Star/release alerts
+node src/index.js                          Run normally (collect + analyze + deliver + keep polling)
+node src/index.js --once                   Run one cycle and stop (good for testing or cron jobs)
+node src/index.js --test                   Check if Ollama, Telegram, GitHub, Reddit, Arxiv are working
+node src/index.js --status                 See what's in the database without running anything
+node src/index.js --briefing               Generate today's briefing right now
+node src/index.js --trend                  Generate this week's trend report right now
+node src/index.js --backfill 2026-03-20    Go back and collect older data you missed
+node src/index.js --reset                  Delete all analysis (keeps raw data, re-analyzes on next run)
+node src/index.js --help                   Show all commands
 ```
-
-Data flows left to right. Each step saves results to a local SQLite database. If any step fails (Ollama is down, internet drops), the work queues up and processes when the service returns. You can stop the app anytime with Ctrl+C and restart it later. It picks up where it left off.
-
-All logs are saved to `data/newsvision.log`.
 
 ## Stopping and restarting
 
-The app is designed to be turned on and off freely. Everything is saved to the database.
+Press **Ctrl+C** to stop. Run it again whenever you want. It remembers where it left off.
 
-- **Ctrl+C** stops the app. Next time you run it, it continues from where it stopped.
-- **Offline for days?** On restart, it fetches everything it missed and generates separate daily briefings for each missed day (not one big summary).
-- **Ollama crashes?** Data collection continues. Analysis queues up and runs when Ollama comes back.
-- **Telegram is down?** Briefings generate as markdown files. They send to Telegram once it's reachable.
+If you don't run it for a few days, it catches up automatically on the next start. You'll get separate daily briefings for each day you missed, not one big combined message.
+
+If Ollama crashes while it's running, data collection continues. Analysis queues up and processes when Ollama comes back. If Telegram goes down, briefings save as files and send when Telegram returns. Nothing breaks, nothing is lost.
+
+## Files it creates
+
+```
+data/db              The database. All collected stories, analysis results, everything.
+data/newsvision.log  Log file. What the app did and when.
+output/              Briefings and alerts as markdown files (searchable archive).
+```
+
+## How it works under the hood
+
+For the curious: NewsVision runs a loop. Each cycle: fetch new content from all sources, classify each item as relevant or not (using Ollama), summarize the relevant ones, analyze their comments for interesting discussions, check for rising stories and engagement opportunities, generate any due briefings, and deliver everything. Progress is saved to a SQLite database after each step, so it can resume from any point.
 
 ## License
 
-MIT
+MIT — use it however you want.
