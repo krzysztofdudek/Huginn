@@ -101,7 +101,13 @@ async function generateBriefing(range) {
   const fromLabel = new Date(from * 1000).toISOString().slice(0, 16).replace("T", " ") + " UTC";
   const toLabel = new Date(to * 1000).toISOString().slice(0, 16).replace("T", " ") + " UTC";
 
-  const stories = db.getRelevantStoriesInRange(from, to);
+  const allStories = db.getRelevantStoriesInRange(from, to);
+
+  // Prioritize: relevant first, then adjacent. Within each, by points.
+  // Limit to avoid overwhelming both LLM and user.
+  const relevant = allStories.filter((s) => s.relevance === "relevant");
+  const adjacent = allStories.filter((s) => s.relevance === "adjacent");
+  const stories = [...relevant, ...adjacent.slice(0, 30)]; // All relevant + top 30 adjacent
 
   if (stories.length === 0) {
     db.setCursor("last_briefing_ts", to);

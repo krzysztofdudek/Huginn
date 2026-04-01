@@ -12,6 +12,11 @@ function escape(text) {
   return (text || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
+function markdownToTelegramHtml(text) {
+  // Convert **bold** to <b>bold</b>, then escape the rest
+  return escape(text).replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>");
+}
+
 function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
 
 // ── Telegram ──
@@ -102,7 +107,7 @@ async function deliverBriefing(id, content, storyCount, stories, fromLabel, toLa
   }
 
   // Message 1: Briefing text
-  const briefingMsg = `\ud83d\udccb <b>Briefing</b> \u2014 ${escape(label)}\n${storyCount} relevant stories\n\n${escape(content)}`;
+  const briefingMsg = `\ud83d\udccb <b>Briefing</b> \u2014 ${escape(label)}\n${storyCount} relevant stories\n\n${markdownToTelegramHtml(content)}`;
   const sent1 = await sendTelegram(briefingMsg);
   if (!sent1) return false;
 
@@ -140,7 +145,7 @@ async function deliverBriefing(id, content, storyCount, stories, fromLabel, toLa
 
 async function deliverWeekly(id, content, storyCount) {
   const week = id.replace("weekly-", "");
-  const text = `\ud83d\udcca <b>Weekly Trend</b> \u2014 ${week}\n${storyCount} stories analyzed\n\n${escape(content)}`;
+  const text = `\ud83d\udcca <b>Weekly Trend</b> \u2014 ${week}\n${storyCount} stories analyzed\n\n${markdownToTelegramHtml(content)}`;
 
   writeToFile(`${id}.md`, `# Weekly Trend \u2014 ${week}\n${storyCount} stories analyzed\n\n${content}`);
 
@@ -194,7 +199,14 @@ async function deliverThreadReply(thread) {
 async function deliverOpportunity(opp) {
   const story = db.getStory(opp.story_id) || {};
   const link = storyLink(story);
-  const commentText = (opp.text || "").replace(/<[^>]+>/g, "").slice(0, 300);
+  const commentText = (opp.text || "")
+    .replace(/<p>/gi, "\n").replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<a\s+href="([^"]*)"[^>]*>[^<]*<\/a>/gi, "$1")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"').replace(/&#x27;/g, "'").replace(/&#x2F;/g, "/")
+    .replace(/\s+/g, " ").trim()
+    .slice(0, 400);
   const extract = opp.extract || "";
 
   const content = `Opportunity in: ${opp.title}\n\n${opp.author}: "${commentText}"\n\nWhy: ${extract}\n\n${link}`;
@@ -238,7 +250,7 @@ async function deliverCompetitive(content, storyId) {
   const mode = config.delivery || "both";
   if (mode === "file") return true;
 
-  return sendTelegram(`\ud83d\udd0d <b>Competitor</b>\n\n${escape(content)}`);
+  return sendTelegram(`\ud83d\udd0d <b>Competitor</b>\n\n${markdownToTelegramHtml(content)}`);
 }
 
 // ── Flush unsent ──
