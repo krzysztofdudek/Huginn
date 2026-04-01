@@ -40,9 +40,12 @@ function resolveStartDate() {
   const existing = db.getCursorInt("story");
   if (existing) return null; // Already initialized
 
-  // First run: use config.startDate or today
-  const startDate = config.startDate || new Date().toISOString().slice(0, 10);
-  return startDate;
+  // First run: use config.startDate or right now
+  if (config.startDate) return config.startDate;
+
+  // null startDate = start from now (not beginning of day)
+  // This way new users don't wait hours for a day to finish before getting a briefing
+  return "now";
 }
 
 function dateToTs(s) {
@@ -545,11 +548,13 @@ async function main() {
   // Initialize start date if first run
   const startDate = resolveStartDate();
   if (startDate) {
-    const ts = dateToTs(startDate);
+    const ts = startDate === "now" ? Math.floor(Date.now() / 1000) : dateToTs(startDate);
+    const label = startDate === "now" ? "now" : startDate;
     db.setCursor("story", ts);
     db.setCursor("comment", ts);
-    db.setCursor("since_date", startDate);
-    logDone(`First run. Collecting from ${startDate}.`);
+    db.setCursor("since_date", label);
+    db.setCursor("last_briefing_ts", ts);
+    logDone(`First run. Collecting from ${label}.`);
   }
 
   const storyCursor = db.getCursorInt("story");

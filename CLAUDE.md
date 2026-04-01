@@ -67,7 +67,7 @@ Versioning: semver. Breaking changes = major. New features = minor. Fixes = patc
 1. Does `--help` text still match the actual behavior? If you added a flag, renamed something, or changed a default, update the help text in `index.js`.
 2. Does `--test` still check all services the app uses? If you added a new data source, add a connectivity check.
 3. Does the README still match? If you changed commands, config fields, or setup steps, update README.md.
-4. Does `config.example.json` still cover all fields? If you added a new config option, add it with a sensible default and a comment-like description.
+4. **Config changes require BOTH files.** Any change to config structure MUST be reflected in BOTH `config.json` AND `config.example.json`. No exceptions. Same rule applies to `secrets.json` and `secrets.example.json`.
 5. Are there hardcoded personal references? No usernames, repo names, project names, or topics in source code. Everything comes from config.
 6. Does `CHANGELOG.md` have an entry for this change? If this is a release, bump `package.json` version too.
 
