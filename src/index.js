@@ -131,9 +131,9 @@ async function collect() {
     const myComments = await collector.collectMyComments();
     if (myComments > 0) logDone(`HN: ${myComments} of your comments found`);
 
-    spinnerStart("HN: refreshing points...");
-    const refreshed = await collector.refreshRecentPoints();
-    spinnerStop(`HN: ${refreshed} stories refreshed`);
+    spinnerStart("HN: updating points on recent stories...");
+    await collector.refreshRecentPoints();
+    spinnerStop(`HN: points updated`);
 
     // GitHub
     const lastGhDiscovery = db.getCursorInt("github_discovery") || 0;
