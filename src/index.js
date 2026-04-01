@@ -55,10 +55,9 @@ function dateToTs(s) {
 }
 
 function showLogo() {
-  const o = "\x1b[38;5;208m"; // orange
-  const y = "\x1b[38;5;214m"; // yellow
-  const r = "\x1b[0m";        // reset
-  const d = "\x1b[2m";        // dim
+  const o = "\x1b[38;5;208m";
+  const r = "\x1b[0m";
+  const d = "\x1b[2m";
 
   console.log("");
   console.log(o + "  \u2591\u2592\u2593\u2588\u2593\u2592\u2591\u2591\u2592\u2593\u2588\u2593\u2592\u2591\u2592\u2593\u2588\u2593\u2592\u2591\u2591\u2592\u2593\u2588\u2593\u2592\u2591\u2591\u2592\u2593\u2588\u2588\u2588\u2588\u2588\u2588\u2593\u2592\u2591\u2591\u2592\u2593\u2588\u2593\u2592\u2591\u2592\u2593\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2593\u2592\u2591\u2591\u2592\u2593\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2593\u2592\u2591" + r);
@@ -131,9 +130,9 @@ async function collect() {
     const myComments = await collector.collectMyComments();
     if (myComments > 0) logDone(`HN: ${myComments} of your comments found`);
 
-    spinnerStart("HN: updating points on recent stories...");
-    await collector.refreshRecentPoints();
-    spinnerStop(`HN: points updated`);
+    spinnerStart("HN: updating points on tracked stories...");
+    const refresh = await collector.refreshRecentPoints();
+    spinnerStop(`HN: ${refresh.matched} stories updated` + (refresh.newlyQualified > 0 ? `, ${refresh.newlyQualified} new qualifying` : ""));
 
     // GitHub
     const lastGhDiscovery = db.getCursorInt("github_discovery") || 0;
@@ -411,11 +410,12 @@ function showStatus() {
   const s = db.getStats();
   const storyCursor = db.getCursorInt("story");
   const sinceDate = db.getCursor("since_date");
-  const lastDaily = db.getCursor("last_daily_digest") || "(none)";
+  const lastBriefing = db.getCursor("last_briefing_ts");
 
   console.log("  \x1b[1mDatabase\x1b[0m");
   console.log("  Since: " + (sinceDate || "(not started)"));
   console.log("  Last fetch: " + (storyCursor ? new Date(storyCursor * 1000).toISOString().replace("T", " ").slice(0, 19) + " UTC" : "(never)"));
+  console.log("  Last briefing: " + (lastBriefing ? new Date(parseInt(lastBriefing) * 1000).toISOString().replace("T", " ").slice(0, 19) + " UTC" : "(never)"));
   console.log("");
   console.log("  \x1b[1mHacker News\x1b[0m");
   console.log("  Stories: " + s.stories + " | Comments: " + s.comments);

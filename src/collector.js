@@ -141,21 +141,32 @@ async function collectMyComments() {
 
 async function refreshRecentPoints() {
   const sinceTs = Math.floor(Date.now() / 1000) - (config.collector.refreshRecentHours || 48) * 3600;
-  let count = 0;
+  let fetched = 0;
+  let matched = 0;
+  let newlyQualified = 0;
   const url = `${ALGOLIA}/search_by_date?tags=story&numericFilters=created_at_i>${sinceTs}`;
   await fetchAllPages(url, (hits) => {
     const stories = hits.map(normalizeStory);
-    db.upsertStories(stories);
-    db.snapshotPoints(stories);
-    count += stories.length;
-    // Re-enqueue newly qualifying stories
+    // Only update stories we already have in our DB
+    for (const s of stories) {
+      const existing = db.getStory(s.id);
+      if (existing) {
+        db.upsertStories([s]);
+        db.snapshotPoints([s]);
+        matched++;
+      }
+    }
+    fetched += stories.length;
+    // Also check if any new stories now qualify for classification
     for (const s of stories) {
       if (s.points >= (config.collector.minPoints || 5) && !db.getAnalysis(s.id)) {
+        db.upsertStories([s]);
         db.enqueue("classify", s.id);
+        newlyQualified++;
       }
     }
   });
-  return count;
+  return { fetched, matched, newlyQualified };
 }
 
 module.exports = { collectStories, collectComments, collectMyComments, refreshRecentPoints };
