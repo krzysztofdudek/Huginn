@@ -13,6 +13,7 @@ const comments = require("./comments");
 const people = require("./people");
 const intelligence = require("./intelligence");
 const telegramBot = require("./telegram-bot");
+const hnDeep = require("./hn-deep-fetch");
 const delivery = require("./delivery");
 const config = require("./config");
 
@@ -198,6 +199,11 @@ async function analyze() {
       spinnerUpdate(`Summarizing articles... ${summarized}/${summarizeTotal}`);
     }
     spinnerStop(summarized > 0 ? `${summarized} articles summarized` : "Summaries up to date");
+
+    // Deep fetch: get full comment trees with scores for relevant HN stories
+    spinnerStart("Fetching full comment trees for relevant stories...");
+    const deep = await hnDeep.deepFetchRelevantStories();
+    spinnerStop(deep.fetched > 0 ? `${deep.fetched} stories deep-fetched, ${deep.comments} comments with scores` : "Comment trees up to date");
 
     // Comments (batch of 3 — each takes ~3s)
     let commentsTotal = db.pendingCount("analyze_comments");
