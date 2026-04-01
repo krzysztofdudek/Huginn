@@ -12,6 +12,7 @@ const githubAnalyzer = require("./github-analyzer");
 const comments = require("./comments");
 const people = require("./people");
 const intelligence = require("./intelligence");
+const telegramBot = require("./telegram-bot");
 const delivery = require("./delivery");
 const config = require("./config");
 
@@ -444,14 +445,22 @@ async function fullCycle() {
 }
 
 async function liveLoop() {
-  log(`Live mode. Poll every ${config.collector.pollSeconds}s. Ctrl+C to stop.\n`);
+  telegramBot.startPolling();
+  log(`Live mode. Poll every ${config.collector.pollSeconds}s. Bot commands active. Ctrl+C to stop.\n`);
   while (true) {
     try {
+      // Check for bot commands between cycles
+      await telegramBot.processUpdates();
       await fullCycle();
     } catch (err) {
       console.error(`Cycle error: ${err.message}`);
     }
-    await sleep(POLL_MS);
+    // Poll bot commands more frequently during wait
+    const pollEnd = Date.now() + POLL_MS;
+    while (Date.now() < pollEnd) {
+      await sleep(3000);
+      try { await telegramBot.processUpdates(); } catch {}
+    }
   }
 }
 
