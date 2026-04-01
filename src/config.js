@@ -17,6 +17,7 @@ const DEFAULTS = {
     rising: { minGrowth: 20, windowHours: 6 },
     askHnAlert: { minPoints: 10 },
     competitive: { checkGithub: true },
+    briefingHoursUTC: [8, 20],
   },
   delivery: "file",
   interests: [],

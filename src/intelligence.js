@@ -26,34 +26,44 @@ function weekId(ts) {
   return `${d.getFullYear()}-W${String(week).padStart(2, "0")}`;
 }
 
-// ── Find missing days that need briefings ──
+// ── Briefing trigger: range-based ──
 
-function getMissingBriefingDays() {
-  const sinceDate = db.getCursor("since_date");
-  if (!sinceDate) return [];
-
-  const delivered = new Set(db.getDeliveredDays("daily").map((id) => id.replace("daily-", "")));
-
-  const startTs = Math.floor(new Date(sinceDate + "T00:00:00Z").getTime() / 1000);
+function shouldGenerateBriefing() {
+  const lastBriefingTs = parseInt(db.getCursor("last_briefing_ts") || "0", 10);
   const now = Math.floor(Date.now() / 1000);
-  const today = dayId(now);
 
-  const missing = [];
-  let ts = startTs;
-  while (ts < now) {
-    const d = dayId(ts);
-    if (d !== today && !delivered.has(d)) { // Don't generate for today yet (day not finished)
-      missing.push(d);
+  if (lastBriefingTs === 0) {
+    // First briefing ever — generate if we have data
+    const sinceDate = db.getCursor("since_date");
+    if (!sinceDate) return null;
+    const sinceTs = Math.floor(new Date(sinceDate + "T00:00:00Z").getTime() / 1000);
+    // Only if at least one briefing hour has passed since start
+    const briefingHours = (config.intelligence && config.intelligence.briefingHoursUTC) || [8, 20];
+    const hour = new Date().getUTCHours();
+    if (!briefingHours.some((h) => hour >= h)) return null;
+    return { from: sinceTs, to: now };
+  }
+
+  // Check if any briefing hour boundary was crossed since last briefing
+  const briefingHours = (config.intelligence && config.intelligence.briefingHoursUTC) || [8, 20];
+  const lastDate = new Date(lastBriefingTs * 1000);
+  const nowDate = new Date();
+
+  // Walk from last briefing time to now, check if we crossed any trigger hour
+  let checkTs = lastBriefingTs;
+  while (checkTs < now) {
+    const d = new Date(checkTs * 1000);
+    for (const h of briefingHours) {
+      // Build timestamp for this hour on this day
+      const triggerTs = Math.floor(new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), h)).getTime() / 1000);
+      if (triggerTs > lastBriefingTs && triggerTs <= now) {
+        return { from: lastBriefingTs, to: now };
+      }
     }
-    ts += DAY;
-  }
-  // Include today if it's past 20:00 UTC (day is mostly done)
-  const hour = new Date().getUTCHours();
-  if (hour >= 20 && !delivered.has(today)) {
-    missing.push(today);
+    checkTs += DAY;
   }
 
-  return missing;
+  return null;
 }
 
 function getMissingWeeklyReports() {
@@ -81,44 +91,44 @@ function getMissingWeeklyReports() {
   return missing;
 }
 
-// ── Daily Briefing ──
+// ── Briefing ──
 
-async function generateDailyBriefing(date) {
-  const id = "daily-" + date;
-  if (db.getDelivery(id)) return null; // Already exists
+async function generateBriefing(range) {
+  const { from, to } = range;
+  const now = Math.floor(Date.now() / 1000);
+  const id = "briefing-" + from + "-" + to;
 
-  const { from, to } = dayRange(date);
+  const fromLabel = new Date(from * 1000).toISOString().slice(0, 16).replace("T", " ") + " UTC";
+  const toLabel = new Date(to * 1000).toISOString().slice(0, 16).replace("T", " ") + " UTC";
+
   const stories = db.getRelevantStoriesInRange(from, to);
 
   if (stories.length === 0) {
-    // Still save empty delivery so we don't retry
-    db.saveDelivery(id, "daily", `No relevant stories on ${date}.`);
-    return { id, content: `No relevant stories on ${date}.`, storyCount: 0 };
+    db.setCursor("last_briefing_ts", to);
+    return null;
   }
 
   const storiesBlock = stories.slice(0, 25).map((s) =>
     `[${s.points} pts, ${s.relevance}] ${s.title}\n  ${s.summary || "(no summary)"}`
   ).join("\n\n");
 
-  // Opportunities from comment analysis
   const opportunities = db.getOpportunitiesInRange(from, to);
   const oppBlock = opportunities.slice(0, 5).map((o) =>
     `In "${o.title}": ${o.author} (${o.comment_points} pts): ${stripHtml(o.text).slice(0, 200)}`
   ).join("\n\n");
 
-  // Rising
   const rising = db.getRisingStories(
     config.intelligence.rising.windowHours || 6,
     config.intelligence.rising.minGrowth || 20
   ).filter((s) => s.created_at >= from && s.created_at < to);
 
   const risingBlock = rising.slice(0, 3).map((s) =>
-    `[${s.prev_points}→${s.points} pts] ${s.title}`
+    `[${s.prev_points}\u2192${s.points} pts] ${s.title}`
   ).join("\n");
 
   const content = await ollama.chat(
-    "You write daily intelligence briefings based on stories from multiple sources (Hacker News, Reddit, Arxiv, GitHub). Be thorough but clear. No bullet markers. Clear sections. Mention the source when referencing a story.",
-    `Generate daily briefing for ${date}.
+    "You write intelligence briefings based on stories from multiple sources (Hacker News, Reddit, Arxiv, GitHub). Be thorough but clear. No bullet markers. Clear sections. Mention the source when referencing a story.",
+    `Generate briefing covering ${fromLabel} to ${toLabel}.
 
 Relevant stories (${stories.length}):
 ${storiesBlock}
@@ -131,14 +141,15 @@ Sections:
 **What happened** (5-8 most important stories, ranked by relevance not points, one sentence each. Deduplicate similar stories. Mention source: HN/Reddit/arxiv.)
 **Rising** (1-3 gaining momentum, skip if none)
 **Worth joining** (0-3 discussions with a specific comment to respond to, skip if none)
-**One-liner** (mood/theme of the day in one sentence)`,
+**One-liner** (mood/theme in one sentence)`,
     { temperature: 0.3, maxTokens: 2000 }
   );
 
   if (!content) return null;
 
-  db.saveDelivery(id, "daily", content);
-  return { id, content, storyCount: stories.length, stories };
+  db.saveDelivery(id, "briefing", content);
+  db.setCursor("last_briefing_ts", to);
+  return { id, content, storyCount: stories.length, stories, fromLabel, toLabel };
 }
 
 // ── Weekly Trend ──
@@ -337,7 +348,7 @@ async function checkShowHnCompetitors() {
 }
 
 module.exports = {
-  getMissingBriefingDays, getMissingWeeklyReports,
-  generateDailyBriefing, generateWeeklyTrend,
+  shouldGenerateBriefing, generateBriefing,
+  getMissingWeeklyReports, generateWeeklyTrend,
   detectRising, detectFreshOpportunities, checkMyThreadReplies, checkWatchedRepoChanges, checkShowHnCompetitors,
 };

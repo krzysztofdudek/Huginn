@@ -73,17 +73,17 @@ function formatStoryLine(story) {
   return `${pts}[${sourceLabel(story)}] ${cleanTitle(story)}`;
 }
 
-// ── Daily Briefing ──
+// ── Briefing ──
 
-async function deliverDaily(id, content, storyCount, stories) {
-  const date = id.replace("daily-", "");
+async function deliverBriefing(id, content, storyCount, stories, fromLabel, toLabel) {
+  const label = fromLabel && toLabel ? `${fromLabel} \u2192 ${toLabel}` : id;
   stories = stories || [];
 
   const mustRead = stories.slice(0, 5);
   const alsoRelevant = stories.slice(5);
 
   // Build markdown file (full)
-  let md = `# Daily Briefing \u2014 ${date}\n${storyCount} relevant stories\n\n${content}`;
+  let md = `# Briefing \u2014 ${label}\n${storyCount} relevant stories\n\n${content}`;
   if (mustRead.length > 0) {
     md += "\n\n## Must read\n";
     for (const s of mustRead) md += `- ${formatStoryLine(s)}\n  ${storyLink(s)}\n`;
@@ -102,14 +102,14 @@ async function deliverDaily(id, content, storyCount, stories) {
   }
 
   // Message 1: Briefing text
-  const briefingMsg = `\ud83d\udccb <b>Daily Briefing</b> \u2014 ${date}\n${storyCount} relevant stories\n\n${escape(content)}`;
+  const briefingMsg = `\ud83d\udccb <b>Briefing</b> \u2014 ${escape(label)}\n${storyCount} relevant stories\n\n${escape(content)}`;
   const sent1 = await sendTelegram(briefingMsg);
   if (!sent1) return false;
 
   // Message 2: Must read links
   if (mustRead.length > 0) {
     await sleep(200);
-    let linksMsg = `\ud83d\udccc <b>Must read</b> \u2014 ${date}`;
+    let linksMsg = `\ud83d\udccc <b>Must read</b> \u2014 ${escape(label)}`;
     for (const s of mustRead) {
       linksMsg += `\n\n${escape(formatStoryLine(s))}\n${storyLink(s)}`;
     }
@@ -119,7 +119,7 @@ async function deliverDaily(id, content, storyCount, stories) {
   // Message 3+: Also relevant (chunked if needed)
   if (alsoRelevant.length > 0) {
     await sleep(200);
-    let chunk = `\ud83d\udd17 <b>Also relevant</b> \u2014 ${date}`;
+    let chunk = `\ud83d\udd17 <b>Also relevant</b> \u2014 ${escape(label)}`;
     for (const s of alsoRelevant) {
       const line = `\n\n${escape(formatStoryLine(s))}\n${storyLink(s)}`;
       if (chunk.length + line.length > 3500) {
@@ -248,7 +248,7 @@ async function flushUnsent() {
   let sent = 0;
   for (const d of unsent) {
     let ok = false;
-    if (d.type === "daily") ok = await deliverDaily(d.id, d.content, 0, []);
+    if (d.type === "briefing" || d.type === "daily") ok = await deliverBriefing(d.id, d.content, 0, []);
     else if (d.type === "weekly") ok = await deliverWeekly(d.id, d.content, 0);
     else if (d.type === "competitive") ok = await deliverCompetitive(d.content, 0);
     if (ok) sent++;
@@ -258,6 +258,6 @@ async function flushUnsent() {
 }
 
 module.exports = {
-  deliverDaily, deliverWeekly, deliverRising, deliverOpportunity, deliverThreadReply, deliverStarChange, deliverRelease, deliverCompetitive,
+  deliverBriefing, deliverWeekly, deliverRising, deliverOpportunity, deliverThreadReply, deliverStarChange, deliverRelease, deliverCompetitive,
   flushUnsent, writeToFile,
 };

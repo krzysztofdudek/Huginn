@@ -280,15 +280,15 @@ async function runIntelligence() {
       await sleep(200);
     }
 
-    // Retrospective daily briefings
+    // Briefing (range-based, triggered by configured hours)
     if (ollama.isAvailable()) {
-      const missingDays = intelligence.getMissingBriefingDays();
-      for (const date of missingDays) {
-        log(`📋 Generating briefing for ${date}...`);
-        const result = await intelligence.generateDailyBriefing(date);
+      const range = intelligence.shouldGenerateBriefing();
+      if (range) {
+        log(`\ud83d\udccb Generating briefing for ${new Date(range.from * 1000).toISOString().slice(0, 16)} \u2192 ${new Date(range.to * 1000).toISOString().slice(0, 16)}...`);
+        const result = await intelligence.generateBriefing(range);
         if (result) {
-          await delivery.deliverDaily(result.id, result.content, result.storyCount, result.stories);
-          actions.push(`daily:${date}`);
+          await delivery.deliverBriefing(result.id, result.content, result.storyCount, result.stories, result.fromLabel, result.toLabel);
+          actions.push("briefing");
           await sleep(200);
         }
       }
@@ -560,10 +560,12 @@ async function main() {
   }
 
   if (args.briefing) {
-    const today = new Date().toISOString().slice(0, 10);
-    log(`Generating briefing for ${today}...`);
-    const result = await intelligence.generateDailyBriefing(today);
-    if (result) await delivery.deliverDaily(result.id, result.content, result.storyCount, result.stories);
+    const lastTs = parseInt(db.getCursor("last_briefing_ts") || "0", 10);
+    const now = Math.floor(Date.now() / 1000);
+    const from = lastTs || (now - 86400); // Default: last 24h
+    log(`Generating briefing...`);
+    const result = await intelligence.generateBriefing({ from, to: now });
+    if (result) await delivery.deliverBriefing(result.id, result.content, result.storyCount, result.stories, result.fromLabel, result.toLabel);
     printStats();
     db.close();
     return;
