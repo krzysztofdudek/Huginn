@@ -16,7 +16,7 @@ It runs on your machine with a local AI model. Nothing goes to the cloud. You te
 
 **Real-time pings when:**
 - A post in your area suddenly takes off
-- Someone writes a comment you'd want to respond to
+- A conversation develops under a relevant post that you could meaningfully contribute to (with thread context so you know what they're talking about)
 - Someone replies to your HN comment (HN doesn't do notifications)
 - A new project shows up that's in your space
 - One of your GitHub repos gets a release or stars spike
@@ -116,6 +116,7 @@ Go to GitHub > Settings > Developer settings > Fine-grained tokens > create one 
 | `github.watchRepos` | Repos to monitor for new releases and star changes. | `[]` (skipped) |
 | `reddit.subreddits` | Subreddits to read. | `[]` (skipped) |
 | `intelligence.briefingHoursUTC` | Hours (in UTC) when briefings are generated. | `[8, 20]` |
+| `liveComments` | Watch for new comments on relevant HN posts and alert when a conversation is worth joining. Uses more API calls and Ollama time. | `true` |
 | `delivery` | How to send you results. | `"file"` |
 
 **`secrets.json`** has your private tokens (never committed to git):

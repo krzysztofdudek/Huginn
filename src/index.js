@@ -205,15 +205,21 @@ async function analyze() {
     const deep = await hnDeep.deepFetchRelevantStories();
     spinnerStop(deep.fetched > 0 ? `${deep.fetched} stories deep-fetched, ${deep.comments} comments with scores` : "Comment trees up to date");
 
-    // Comments (batch of 3 — each takes ~3s)
-    let commentsTotal = db.pendingCount("analyze_comments");
-    let commentsDone = 0;
-    spinnerStart(commentsTotal > 0 ? `Analyzing comments... 0/${commentsTotal} stories` : "Comments up to date");
-    while ((batch = await comments.processCommentQueue(3)) > 0) {
-      commentsDone += batch;
-      spinnerUpdate(`Analyzing comments... ${commentsDone}/${commentsTotal} stories`);
+    // Live comment analysis: analyze DELTA (new comments only) from deep fetch
+    if (config.liveComments !== false && deep.newComments && deep.newComments.length > 0) {
+      spinnerStart(`Analyzing ${deep.newComments.length} new comments...`);
+      const liveOpportunities = await comments.analyzeNewComments(deep.newComments);
+      if (liveOpportunities.length > 0) {
+        spinnerStop(`${liveOpportunities.length} conversations worth joining`);
+        // Send alerts immediately
+        for (const opp of liveOpportunities) {
+          await delivery.deliverOpportunity(opp);
+          await sleep(200);
+        }
+      } else {
+        spinnerStop("No new conversations to join");
+      }
     }
-    spinnerStop(commentsDone > 0 ? `${commentsDone} story comment batches analyzed` : "Comments up to date");
 
     // GitHub repos (batch of 10)
     let reposTotal = db.pendingCount("classify_repo");
@@ -224,25 +230,6 @@ async function analyze() {
       spinnerUpdate(`Classifying GitHub repos... ${reposClassified}/${reposTotal}`);
     }
     spinnerStop(reposClassified > 0 ? `${reposClassified} repos classified` : "Repos up to date");
-
-    // Catch-up: enqueue any relevant stories with comments but no analysis
-    const missingComments = db.getDb().prepare(`
-      SELECT s.id FROM stories s
-      JOIN story_analysis sa ON sa.story_id = s.id
-      LEFT JOIN (SELECT story_id FROM comment_analysis GROUP BY story_id) ca ON ca.story_id = s.id
-      WHERE sa.relevance IN ('relevant', 'adjacent') AND s.num_comments >= 5 AND ca.story_id IS NULL
-    `).all();
-    for (const s of missingComments) db.enqueue("analyze_comments", s.id);
-
-    // Process any newly enqueued comment analysis
-    if (missingComments.length > 0) {
-      let catchup = 0;
-      while ((batch = await comments.processCommentQueue(3)) > 0) {
-        catchup += batch;
-        spinnerUpdate(`Catching up comments... ${catchup}/${missingComments.length} stories`);
-      }
-      if (catchup > 0) spinnerStop(`${catchup} more story comments analyzed`);
-    }
 
     people.rebuild();
 
@@ -263,15 +250,6 @@ async function runIntelligence() {
       log(`📈 Rising: ${story.title.slice(0, 50)} (+${story.point_growth})`);
       await delivery.deliverRising(story);
       actions.push("rising");
-      await sleep(200);
-    }
-
-    // Opportunity alerts (realtime — fresh comments worth engaging with)
-    const opportunities = intelligence.detectFreshOpportunities();
-    for (const opp of opportunities.slice(0, 3)) { // Max 3 per cycle
-      log(`\ud83d\udca1 Opportunity: ${opp.title.slice(0, 40)} — ${opp.author}`);
-      await delivery.deliverOpportunity(opp);
-      actions.push("opportunity");
       await sleep(200);
     }
 

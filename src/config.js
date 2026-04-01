@@ -19,6 +19,7 @@ const DEFAULTS = {
     competitive: { checkGithub: true },
     briefingHoursUTC: [8, 20],
   },
+  liveComments: true,
   delivery: "file",
   interests: [],
   tags: [],
@@ -66,7 +67,7 @@ if (fs.existsSync(SECRETS_PATH)) {
 // Validate known keys
 const KNOWN_KEYS = new Set([
   "startDate", "hnUsername", "ollama", "github", "reddit", "collector",
-  "analyzer", "intelligence", "delivery", "interests", "tags", "telegram", "arxiv",
+  "analyzer", "intelligence", "liveComments", "delivery", "interests", "tags", "telegram", "arxiv",
 ]);
 for (const key of Object.keys(config)) {
   if (!KNOWN_KEYS.has(key)) {

@@ -29,6 +29,7 @@
     "competitive": { "checkGithub": true },
     "briefingHoursUTC": [8, 20]
   },
+  "liveComments": true,
   "delivery": "file",
   "interests": [
     "Your first area of interest — describe in plain language what topics matter to you",

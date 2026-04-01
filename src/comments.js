@@ -1,104 +1,114 @@
 const db = require("./db");
 const ollama = require("./ollama");
-
-const BATCH_SIZE = 15;
+const config = require("./config");
 
 function stripHtml(html) {
   return (html || "").replace(/<p>/gi, "\n").replace(/<br\s*\/?>/gi, "\n")
     .replace(/<a\s+href="([^"]*)"[^>]*>[^<]*<\/a>/gi, "$1")
     .replace(/<[^>]+>/g, "").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"').replace(/&#x27;/g, "'")
     .replace(/\s+/g, " ").trim();
 }
 
-async function analyzeBatch(story, comments) {
-  const commentBlock = comments.map((c, i) =>
-    `[${i}] ${c.author} (${c.points || 0} pts): ${stripHtml(c.text).slice(0, 250)}`
-  ).join("\n\n");
+function buildParentChain(parentId, storyId, maxDepth) {
+  const chain = [];
+  let currentId = parentId;
 
-  const result = await ollama.chat(
-    `You are a STRICT comment filter. You analyze discussion comments for a software engineer interested in the topics described below. Output ONLY a valid JSON array.
+  for (let i = 0; i < (maxDepth || 3); i++) {
+    if (currentId === storyId) break;
+    const parent = db.getDb().prepare("SELECT * FROM comments WHERE id = ?").get(currentId);
+    if (!parent) break;
+    chain.unshift(parent);
+    currentId = parent.parent_id;
+  }
 
-RULES:
-- insight=1 if the comment shares a non-obvious technical finding, real-world data, or experience that adds knowledge beyond the article itself.
-- need=1 if someone describes a problem they face or asks for a tool/solution. Not just complaining — specifically identifying a gap.
-- opportunity=1 if you could respond with concrete experience from building enforcement tools, knowledge graphs, or verification systems. The comment must be about a topic you have direct expertise in.
-- Most comments will be all zeros. Flag only the genuinely notable ones.
+  return chain;
+}
 
-Output: [{"index":N,"insight":0|1,"need":0|1,"opportunity":0|1,"extract":"one sentence summary"}]`,
-    `Post: "${story.title}"\n\nComments:\n${commentBlock}\n\nJSON array:`,
-    { temperature: 0, maxTokens: 1500 }
-  );
+function formatThread(newComment, parentChain) {
+  let thread = "";
+  for (let i = 0; i < parentChain.length; i++) {
+    const p = parentChain[i];
+    const indent = "  ".repeat(i);
+    const text = stripHtml(p.text).slice(0, 150);
+    thread += `${indent}${p.author} (${p.points || 0}pts): ${text}\n`;
+  }
+  const indent = "  ".repeat(parentChain.length);
+  const text = stripHtml(newComment.text).slice(0, 250);
+  thread += `${indent}> ${newComment.author} (${newComment.points || 0}pts): ${text}`;
+  return thread;
+}
 
-  if (!result) return null;
+// ── Analyze delta: new comments from deep fetch ──
 
-  try {
-    const match = result.match(/\[[\s\S]*\]/);
-    if (!match) return null;
-    const parsed = JSON.parse(match[0]);
+async function analyzeNewComments(newComments) {
+  if (!newComments || newComments.length === 0) return [];
+  if (!ollama.isAvailable()) return [];
 
-    const rows = [];
-    for (const entry of parsed) {
-      const idx = entry.index;
-      if (idx == null || idx < 0 || idx >= comments.length) continue;
-      const c = comments[idx];
-      rows.push({
-        comment_id: c.id,
-        story_id: story.id,
-        is_insight: entry.insight ? 1 : 0,
-        is_need: entry.need ? 1 : 0,
-        is_opportunity: entry.opportunity ? 1 : 0,
-        extract: entry.extract || "",
+  const interests = (config.interests || []).join("\n- ");
+
+  // Group by story
+  const byStory = {};
+  for (const c of newComments) {
+    const sid = String(c.story_id);
+    if (!byStory[sid]) byStory[sid] = { title: c.storyTitle || "", points: c.storyPoints || 0, comments: [] };
+    byStory[sid].comments.push(c);
+  }
+
+  const opportunities = [];
+
+  for (const [storyId, group] of Object.entries(byStory)) {
+    // Build threaded context for each new comment
+    const threads = [];
+    for (const c of group.comments) {
+      const parentChain = buildParentChain(c.parent_id, parseInt(storyId), 3);
+      threads.push({
+        comment: c,
+        formatted: formatThread(c, parentChain),
       });
     }
-    return rows;
-  } catch {
-    return null;
-  }
-}
 
-async function processCommentQueue(limit) {
-  const items = db.dequeueBatch("analyze_comments", limit || 20);
-  if (items.length === 0) return 0;
+    // Skip if too many (batch max ~15 threads per call)
+    const batch = threads.slice(0, 15);
 
-  let done = 0;
-  for (const item of items) {
-    const storyId = parseInt(item.target_id, 10);
-    const story = db.getStory(storyId);
-    if (!story) { db.completeWork(item.id); continue; }
+    const threadsBlock = batch.map((t, i) =>
+      `[${i}] Post: "${group.title}" (${group.points}pts)\n${t.formatted}`
+    ).join("\n\n---\n\n");
 
-    // Get ALL comments for this story, not just top 15
-    const allComments = db.getDb().prepare(
-      "SELECT * FROM comments WHERE story_id = ? ORDER BY points DESC, created_at ASC"
-    ).all(storyId);
-
-    if (allComments.length === 0) { db.completeWork(item.id); continue; }
-
-    // Skip already-analyzed comments
-    const analyzedIds = new Set(
-      db.getCommentAnalysis(storyId).map((ca) => ca.comment_id)
+    const result = await ollama.chat(
+      `You detect conversations worth joining for someone working in these areas:\n- ${interests}\n\nFor each new comment (marked with >), decide if the user could contribute something meaningful from their experience. Most should be false.\n\nOutput ONLY a JSON array: [{"index":N,"join":true|false,"reason":"one sentence"}]`,
+      `These comments just appeared:\n\n${threadsBlock}\n\nJSON array:`,
+      { temperature: 0, maxTokens: 600 }
     );
-    const toAnalyze = allComments.filter((c) => !analyzedIds.has(c.id));
 
-    if (toAnalyze.length === 0) { db.completeWork(item.id); continue; }
+    if (!result) continue;
 
-    // Process in batches of BATCH_SIZE
-    let totalRows = 0;
-    for (let i = 0; i < toAnalyze.length; i += BATCH_SIZE) {
-      const batch = toAnalyze.slice(i, i + BATCH_SIZE);
-      const rows = await analyzeBatch(story, batch);
-      if (rows && rows.length > 0) {
-        db.setCommentAnalysisBatch(rows);
-        totalRows += rows.length;
+    try {
+      const match = result.match(/\[[\s\S]*\]/);
+      if (!match) continue;
+      const parsed = JSON.parse(match[0]);
+
+      for (const entry of parsed) {
+        if (!entry.join || entry.index == null) continue;
+        if (entry.index < 0 || entry.index >= batch.length) continue;
+
+        const t = batch[entry.index];
+        opportunities.push({
+          comment_id: t.comment.id,
+          story_id: parseInt(storyId),
+          story_title: group.title,
+          story_points: group.points,
+          author: t.comment.author,
+          text: t.comment.text,
+          thread_context: t.formatted,
+          reason: entry.reason || "",
+          hn_url: `https://news.ycombinator.com/item?id=${t.comment.id}`,
+        });
       }
-    }
-
-    db.completeWork(item.id);
-    done++;
-    process.stdout.write(`\r  Comments: ${story.title.slice(0, 40)}... (${toAnalyze.length} comments, ${totalRows} flagged)`);
+    } catch {}
   }
 
-  if (done > 0) process.stdout.write("\n");
-  return done;
+  return opportunities;
 }
 
-module.exports = { processCommentQueue };
+module.exports = { analyzeNewComments };
