@@ -530,6 +530,9 @@ async function main() {
 
   showLogo();
 
+  // Register bot commands on every start
+  await telegramBot.registerCommands();
+
   if (args.reset) {
     logWarn("Resetting all analysis (raw data kept)...");
     db.getDb().exec("DELETE FROM story_analysis; DELETE FROM comment_analysis; DELETE FROM work_queue; DELETE FROM deliveries; DELETE FROM people; DELETE FROM github_repo_analysis;");
