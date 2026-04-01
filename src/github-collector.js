@@ -23,9 +23,10 @@ async function ghFetch(url) {
     }
     if (!res.ok) return null;
 
+    // Rate limit warning only when very low (logged at debug level, doesn't break spinner)
     const remaining = res.headers.get("x-ratelimit-remaining");
-    if (remaining && parseInt(remaining) < 10) {
-      console.log(`  GitHub API: ${remaining} requests remaining`);
+    if (remaining && parseInt(remaining) < 5) {
+      console.error(`  GitHub API: only ${remaining} requests remaining`);
     }
 
     return res.json();
@@ -172,8 +173,7 @@ async function collect() {
       console.log("  GitHub API unavailable");
       return results;
     }
-    const remaining = test.resources && test.resources.search && test.resources.search.remaining;
-    console.log(`  GitHub API: ${remaining} search requests remaining`);
+    // Don't log here — spinner is running. Rate limit shown in --test.
 
     results.discovered = await discoverByTopics();
     results.trending = await discoverTrending();
