@@ -219,6 +219,25 @@ async function analyze() {
     }
     spinnerStop(reposClassified > 0 ? `${reposClassified} repos classified` : "Repos up to date");
 
+    // Catch-up: enqueue any relevant stories with comments but no analysis
+    const missingComments = db.getDb().prepare(`
+      SELECT s.id FROM stories s
+      JOIN story_analysis sa ON sa.story_id = s.id
+      LEFT JOIN (SELECT story_id FROM comment_analysis GROUP BY story_id) ca ON ca.story_id = s.id
+      WHERE sa.relevance IN ('relevant', 'adjacent') AND s.num_comments >= 5 AND ca.story_id IS NULL
+    `).all();
+    for (const s of missingComments) db.enqueue("analyze_comments", s.id);
+
+    // Process any newly enqueued comment analysis
+    if (missingComments.length > 0) {
+      let catchup = 0;
+      while ((batch = await comments.processCommentQueue(3)) > 0) {
+        catchup += batch;
+        spinnerUpdate(`Catching up comments... ${catchup}/${missingComments.length} stories`);
+      }
+      if (catchup > 0) spinnerStop(`${catchup} more story comments analyzed`);
+    }
+
     people.rebuild();
 
   } catch (err) {
