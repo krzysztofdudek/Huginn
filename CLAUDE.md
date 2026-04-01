@@ -87,9 +87,20 @@ Versioning: semver. Breaking changes = major. New features = minor. Fixes = patc
 3. Wire into the intelligence phase in `index.js`
 4. Update README and help text
 
-## Database
+## Database and migrations
 
-Single SQLite file at `data/db`. Key tables:
+Single SQLite file at `data/db`. Schema is managed by a versioned migration system in `db.js`.
+
+**How migrations work:** The `MIGRATIONS` array in `db.js` contains numbered migrations. On startup, the app checks which have been applied (tracked in `_migrations` table) and runs any new ones. Users never run migrations manually.
+
+**Adding a schema change:** Add a new entry to the `MIGRATIONS` array with the next version number and the SQL to run. The baseline (version 1) creates all tables. Future migrations use `ALTER TABLE` or `CREATE TABLE` for additions.
+
+```js
+// Example: adding a column in a future version
+{ version: 2, name: "add_story_language", up: "ALTER TABLE stories ADD COLUMN language TEXT" },
+```
+
+Key tables:
 
 - `stories` — posts from all sources (HN, Reddit, Arxiv). Column `type` distinguishes them.
 - `comments` — discussion comments (currently HN only).

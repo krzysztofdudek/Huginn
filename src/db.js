@@ -14,165 +14,130 @@ function getDb() {
   return db;
 }
 
+// ── Migration system ──
+
+const MIGRATIONS = [
+  {
+    version: 1,
+    name: "baseline",
+    up: `
+      CREATE TABLE IF NOT EXISTS cursors (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+
+      CREATE TABLE IF NOT EXISTS stories (
+        id INTEGER PRIMARY KEY, title TEXT, url TEXT, author TEXT,
+        points INTEGER DEFAULT 0, num_comments INTEGER DEFAULT 0,
+        created_at INTEGER NOT NULL, story_text TEXT, type TEXT DEFAULT 'article'
+      );
+
+      CREATE TABLE IF NOT EXISTS comments (
+        id INTEGER PRIMARY KEY, story_id INTEGER NOT NULL, parent_id INTEGER NOT NULL,
+        author TEXT, text TEXT, points INTEGER DEFAULT 0, created_at INTEGER NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS point_snapshots (
+        story_id INTEGER NOT NULL, points INTEGER NOT NULL,
+        num_comments INTEGER NOT NULL, checked_at INTEGER NOT NULL,
+        PRIMARY KEY (story_id, checked_at)
+      );
+
+      CREATE TABLE IF NOT EXISTS story_analysis (
+        story_id INTEGER PRIMARY KEY, relevance TEXT, summary TEXT,
+        tags TEXT, conversation_score REAL DEFAULT 0, analyzed_at INTEGER
+      );
+
+      CREATE TABLE IF NOT EXISTS comment_analysis (
+        comment_id INTEGER PRIMARY KEY, story_id INTEGER NOT NULL,
+        is_insight INTEGER DEFAULT 0, is_need INTEGER DEFAULT 0,
+        is_opportunity INTEGER DEFAULT 0, extract TEXT, analyzed_at INTEGER
+      );
+
+      CREATE TABLE IF NOT EXISTS my_comments (
+        id INTEGER PRIMARY KEY, story_id INTEGER NOT NULL,
+        parent_id INTEGER NOT NULL, text TEXT, points INTEGER DEFAULT 0,
+        created_at INTEGER NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS watched_threads (
+        comment_id INTEGER PRIMARY KEY, story_id INTEGER NOT NULL,
+        last_reply_seen INTEGER DEFAULT 0
+      );
+
+      CREATE TABLE IF NOT EXISTS github_repos (
+        id INTEGER PRIMARY KEY, full_name TEXT UNIQUE, name TEXT, owner TEXT,
+        description TEXT, url TEXT, stars INTEGER DEFAULT 0, forks INTEGER DEFAULT 0,
+        language TEXT, topics TEXT, created_at INTEGER, pushed_at INTEGER,
+        first_seen INTEGER, license TEXT
+      );
+
+      CREATE TABLE IF NOT EXISTS github_repo_analysis (
+        repo_id INTEGER PRIMARY KEY, relevance TEXT, summary TEXT,
+        tags TEXT, analyzed_at INTEGER
+      );
+
+      CREATE TABLE IF NOT EXISTS github_star_snapshots (
+        repo_id INTEGER NOT NULL, stars INTEGER NOT NULL, forks INTEGER NOT NULL,
+        checked_at INTEGER NOT NULL, PRIMARY KEY (repo_id, checked_at)
+      );
+
+      CREATE TABLE IF NOT EXISTS github_releases (
+        id INTEGER PRIMARY KEY, repo_id INTEGER NOT NULL, tag_name TEXT,
+        name TEXT, body TEXT, published_at INTEGER, notified INTEGER DEFAULT 0
+      );
+
+      CREATE TABLE IF NOT EXISTS people (
+        username TEXT PRIMARY KEY, total_comments INTEGER DEFAULT 0,
+        relevant_comments INTEGER DEFAULT 0, avg_points REAL DEFAULT 0,
+        top_tags TEXT, first_seen INTEGER, last_seen INTEGER
+      );
+
+      CREATE TABLE IF NOT EXISTS deliveries (
+        id TEXT PRIMARY KEY, type TEXT NOT NULL, sent INTEGER DEFAULT 0,
+        generated_at INTEGER, sent_at INTEGER, content TEXT
+      );
+
+      CREATE TABLE IF NOT EXISTS work_queue (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, task TEXT NOT NULL,
+        target_id TEXT, params TEXT, status TEXT DEFAULT 'pending',
+        attempts INTEGER DEFAULT 0, last_error TEXT,
+        created_at INTEGER NOT NULL, completed_at INTEGER,
+        UNIQUE(task, target_id)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_comments_story ON comments(story_id);
+      CREATE INDEX IF NOT EXISTS idx_comments_parent ON comments(parent_id);
+      CREATE INDEX IF NOT EXISTS idx_snapshots_story ON point_snapshots(story_id);
+      CREATE INDEX IF NOT EXISTS idx_story_analysis_rel ON story_analysis(relevance);
+      CREATE INDEX IF NOT EXISTS idx_comment_analysis_story ON comment_analysis(story_id);
+      CREATE INDEX IF NOT EXISTS idx_work_queue_status ON work_queue(status, task);
+      CREATE INDEX IF NOT EXISTS idx_stories_created ON stories(created_at);
+      CREATE INDEX IF NOT EXISTS idx_stories_type ON stories(type);
+      CREATE INDEX IF NOT EXISTS idx_my_comments_story ON my_comments(story_id);
+      CREATE INDEX IF NOT EXISTS idx_watched_threads_story ON watched_threads(story_id);
+    `,
+  },
+  // Future migrations go here:
+  // { version: 2, name: "add_something", up: "ALTER TABLE ..." },
+];
+
 function migrate() {
   const d = getDb();
 
-  d.exec(`
-    CREATE TABLE IF NOT EXISTS cursors (
-      key TEXT PRIMARY KEY,
-      value TEXT NOT NULL
-    );
+  // Create migrations tracking table
+  d.exec("CREATE TABLE IF NOT EXISTS _migrations (version INTEGER PRIMARY KEY, name TEXT, applied_at INTEGER)");
 
-    CREATE TABLE IF NOT EXISTS stories (
-      id INTEGER PRIMARY KEY,
-      title TEXT,
-      url TEXT,
-      author TEXT,
-      points INTEGER DEFAULT 0,
-      num_comments INTEGER DEFAULT 0,
-      created_at INTEGER NOT NULL,
-      story_text TEXT,
-      type TEXT DEFAULT 'article'
-    );
+  const applied = new Set(d.prepare("SELECT version FROM _migrations").all().map((r) => r.version));
 
-    CREATE TABLE IF NOT EXISTS comments (
-      id INTEGER PRIMARY KEY,
-      story_id INTEGER NOT NULL,
-      parent_id INTEGER NOT NULL,
-      author TEXT,
-      text TEXT,
-      points INTEGER DEFAULT 0,
-      created_at INTEGER NOT NULL
-    );
-
-    CREATE TABLE IF NOT EXISTS point_snapshots (
-      story_id INTEGER NOT NULL,
-      points INTEGER NOT NULL,
-      num_comments INTEGER NOT NULL,
-      checked_at INTEGER NOT NULL,
-      PRIMARY KEY (story_id, checked_at)
-    );
-
-    CREATE TABLE IF NOT EXISTS story_analysis (
-      story_id INTEGER PRIMARY KEY,
-      relevance TEXT,
-      summary TEXT,
-      tags TEXT,
-      conversation_score REAL DEFAULT 0,
-      analyzed_at INTEGER
-    );
-
-    CREATE TABLE IF NOT EXISTS my_comments (
-      id INTEGER PRIMARY KEY,
-      story_id INTEGER NOT NULL,
-      parent_id INTEGER NOT NULL,
-      text TEXT,
-      points INTEGER DEFAULT 0,
-      created_at INTEGER NOT NULL
-    );
-
-    CREATE TABLE IF NOT EXISTS watched_threads (
-      comment_id INTEGER PRIMARY KEY,
-      story_id INTEGER NOT NULL,
-      last_reply_seen INTEGER DEFAULT 0
-    );
-
-    CREATE TABLE IF NOT EXISTS comment_analysis (
-      comment_id INTEGER PRIMARY KEY,
-      story_id INTEGER NOT NULL,
-      is_insight INTEGER DEFAULT 0,
-      is_need INTEGER DEFAULT 0,
-      is_opportunity INTEGER DEFAULT 0,
-      extract TEXT,
-      analyzed_at INTEGER
-    );
-
-    CREATE TABLE IF NOT EXISTS github_repos (
-      id INTEGER PRIMARY KEY,
-      full_name TEXT UNIQUE,
-      name TEXT,
-      owner TEXT,
-      description TEXT,
-      url TEXT,
-      stars INTEGER DEFAULT 0,
-      forks INTEGER DEFAULT 0,
-      language TEXT,
-      topics TEXT,
-      created_at INTEGER,
-      pushed_at INTEGER,
-      first_seen INTEGER,
-      license TEXT
-    );
-
-    CREATE TABLE IF NOT EXISTS github_repo_analysis (
-      repo_id INTEGER PRIMARY KEY,
-      relevance TEXT,
-      summary TEXT,
-      tags TEXT,
-      analyzed_at INTEGER
-    );
-
-    CREATE TABLE IF NOT EXISTS github_star_snapshots (
-      repo_id INTEGER NOT NULL,
-      stars INTEGER NOT NULL,
-      forks INTEGER NOT NULL,
-      checked_at INTEGER NOT NULL,
-      PRIMARY KEY (repo_id, checked_at)
-    );
-
-    CREATE TABLE IF NOT EXISTS github_releases (
-      id INTEGER PRIMARY KEY,
-      repo_id INTEGER NOT NULL,
-      tag_name TEXT,
-      name TEXT,
-      body TEXT,
-      published_at INTEGER,
-      notified INTEGER DEFAULT 0
-    );
-
-    CREATE TABLE IF NOT EXISTS people (
-      username TEXT PRIMARY KEY,
-      total_comments INTEGER DEFAULT 0,
-      relevant_comments INTEGER DEFAULT 0,
-      avg_points REAL DEFAULT 0,
-      top_tags TEXT,
-      first_seen INTEGER,
-      last_seen INTEGER
-    );
-
-    CREATE TABLE IF NOT EXISTS deliveries (
-      id TEXT PRIMARY KEY,
-      type TEXT NOT NULL,
-      sent INTEGER DEFAULT 0,
-      generated_at INTEGER,
-      sent_at INTEGER,
-      content TEXT
-    );
-
-    CREATE TABLE IF NOT EXISTS work_queue (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      task TEXT NOT NULL,
-      target_id TEXT,
-      params TEXT,
-      status TEXT DEFAULT 'pending',
-      attempts INTEGER DEFAULT 0,
-      last_error TEXT,
-      created_at INTEGER NOT NULL,
-      completed_at INTEGER,
-      UNIQUE(task, target_id)
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_comments_story ON comments(story_id);
-    CREATE INDEX IF NOT EXISTS idx_comments_parent ON comments(parent_id);
-    CREATE INDEX IF NOT EXISTS idx_snapshots_story ON point_snapshots(story_id);
-    CREATE INDEX IF NOT EXISTS idx_story_analysis_rel ON story_analysis(relevance);
-    CREATE INDEX IF NOT EXISTS idx_comment_analysis_story ON comment_analysis(story_id);
-    CREATE INDEX IF NOT EXISTS idx_work_queue_status ON work_queue(status, task);
-    CREATE INDEX IF NOT EXISTS idx_stories_created ON stories(created_at);
-    CREATE INDEX IF NOT EXISTS idx_stories_type ON stories(type);
-    CREATE INDEX IF NOT EXISTS idx_my_comments_story ON my_comments(story_id);
-    CREATE INDEX IF NOT EXISTS idx_watched_threads_story ON watched_threads(story_id);
-  `);
+  for (const m of MIGRATIONS) {
+    if (applied.has(m.version)) continue;
+    try {
+      d.exec(m.up);
+      d.prepare("INSERT INTO _migrations (version, name, applied_at) VALUES (?, ?, ?)").run(m.version, m.name, Math.floor(Date.now() / 1000));
+      console.log(`  Migration ${m.version} (${m.name}) applied.`);
+    } catch (err) {
+      console.error(`  Migration ${m.version} (${m.name}) failed: ${err.message}`);
+      throw err;
+    }
+  }
 }
 
 // ── Cursors ──
