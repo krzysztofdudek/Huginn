@@ -176,41 +176,41 @@ async function analyze() {
   try {
     let batch;
 
-    // Classify stories
+    // Classify stories (batch of 10 for frequent spinner updates)
     let classifyTotal = db.pendingCount("classify");
     let classified = 0;
     spinnerStart(classifyTotal > 0 ? `Classifying stories... 0/${classifyTotal}` : "Classification up to date");
-    while ((batch = await analyzer.processClassifyQueue(50)) > 0) {
+    while ((batch = await analyzer.processClassifyQueue(10)) > 0) {
       classified += batch;
       spinnerUpdate(`Classifying stories... ${classified}/${classifyTotal}`);
     }
     spinnerStop(classified > 0 ? `${classified} stories classified` : "Classification up to date");
 
-    // Summarize
+    // Summarize (batch of 5 — each takes ~5s)
     let summarizeTotal = db.pendingCount("summarize");
     let summarized = 0;
     spinnerStart(summarizeTotal > 0 ? `Summarizing articles... 0/${summarizeTotal}` : "Summaries up to date");
-    while ((batch = await analyzer.processSummarizeQueue(20)) > 0) {
+    while ((batch = await analyzer.processSummarizeQueue(5)) > 0) {
       summarized += batch;
       spinnerUpdate(`Summarizing articles... ${summarized}/${summarizeTotal}`);
     }
     spinnerStop(summarized > 0 ? `${summarized} articles summarized` : "Summaries up to date");
 
-    // Comments
+    // Comments (batch of 3 — each takes ~3s)
     let commentsTotal = db.pendingCount("analyze_comments");
     let commentsDone = 0;
     spinnerStart(commentsTotal > 0 ? `Analyzing comments... 0/${commentsTotal} stories` : "Comments up to date");
-    while ((batch = await comments.processCommentQueue(10)) > 0) {
+    while ((batch = await comments.processCommentQueue(3)) > 0) {
       commentsDone += batch;
       spinnerUpdate(`Analyzing comments... ${commentsDone}/${commentsTotal} stories`);
     }
     spinnerStop(commentsDone > 0 ? `${commentsDone} story comment batches analyzed` : "Comments up to date");
 
-    // GitHub repos
+    // GitHub repos (batch of 10)
     let reposTotal = db.pendingCount("classify_repo");
     let reposClassified = 0;
     spinnerStart(reposTotal > 0 ? `Classifying GitHub repos... 0/${reposTotal}` : "Repos up to date");
-    while ((batch = await githubAnalyzer.processClassifyRepoQueue(50)) > 0) {
+    while ((batch = await githubAnalyzer.processClassifyRepoQueue(10)) > 0) {
       reposClassified += batch;
       spinnerUpdate(`Classifying GitHub repos... ${reposClassified}/${reposTotal}`);
     }
