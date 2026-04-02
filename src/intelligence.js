@@ -28,42 +28,49 @@ function weekId(ts) {
 
 // ── Briefing trigger: range-based ──
 
-function shouldGenerateBriefing() {
+function getMissingBriefings() {
   const lastBriefingTs = parseInt(db.getCursor("last_briefing_ts") || "0", 10);
   const now = Math.floor(Date.now() / 1000);
+  const briefingHours = (config.intelligence && config.intelligence.briefingHoursUTC) || [8, 20];
 
+  let fromTs;
   if (lastBriefingTs === 0) {
-    // First briefing ever — generate if we have data
     const sinceDate = db.getCursor("since_date");
-    if (!sinceDate) return null;
-    const sinceTs = Math.floor(new Date(sinceDate + "T00:00:00Z").getTime() / 1000);
-    // Only if at least one briefing hour has passed since start
-    const briefingHours = (config.intelligence && config.intelligence.briefingHoursUTC) || [8, 20];
-    const hour = new Date().getUTCHours();
-    if (!briefingHours.some((h) => hour >= h)) return null;
-    return { from: sinceTs, to: now };
+    if (!sinceDate) return [];
+    fromTs = Math.floor(new Date(sinceDate + "T00:00:00Z").getTime() / 1000);
+  } else {
+    fromTs = lastBriefingTs;
   }
 
-  // Check if any briefing hour boundary was crossed since last briefing
-  const briefingHours = (config.intelligence && config.intelligence.briefingHoursUTC) || [8, 20];
-  const lastDate = new Date(lastBriefingTs * 1000);
-  const nowDate = new Date();
-
-  // Walk from last briefing time to now, check if we crossed any trigger hour
-  let checkTs = lastBriefingTs;
-  while (checkTs < now) {
+  // Collect all trigger timestamps that have been crossed since fromTs
+  const triggers = [];
+  let checkTs = fromTs;
+  while (checkTs <= now + DAY) {
     const d = new Date(checkTs * 1000);
     for (const h of briefingHours) {
-      // Build timestamp for this hour on this day
       const triggerTs = Math.floor(new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), h)).getTime() / 1000);
-      if (triggerTs > lastBriefingTs && triggerTs <= now) {
-        return { from: lastBriefingTs, to: now };
+      if (triggerTs > fromTs && triggerTs <= now) {
+        triggers.push(triggerTs);
       }
     }
     checkTs += DAY;
   }
 
-  return null;
+  if (triggers.length === 0) return [];
+
+  // Sort and deduplicate
+  triggers.sort((a, b) => a - b);
+  const unique = [...new Set(triggers)];
+
+  // Build one range per trigger: [prev, trigger]
+  const ranges = [];
+  let prev = fromTs;
+  for (const t of unique) {
+    ranges.push({ from: prev, to: t });
+    prev = t;
+  }
+
+  return ranges;
 }
 
 function getMissingWeeklyReports() {
@@ -353,7 +360,7 @@ async function checkShowHnCompetitors() {
 }
 
 module.exports = {
-  shouldGenerateBriefing, generateBriefing,
+  getMissingBriefings, generateBriefing,
   getMissingWeeklyReports, generateWeeklyTrend,
   detectRising, detectFreshOpportunities, checkMyThreadReplies, checkWatchedRepoChanges, checkShowHnCompetitors,
 };

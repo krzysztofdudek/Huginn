@@ -290,8 +290,8 @@ async function runIntelligence() {
 
     // Briefing (range-based, triggered by configured hours)
     if (ollama.isAvailable()) {
-      const range = intelligence.shouldGenerateBriefing();
-      if (range) {
+      const briefingRanges = intelligence.getMissingBriefings();
+      for (const range of briefingRanges) {
         log(`\ud83d\udccb Generating briefing for ${new Date(range.from * 1000).toISOString().slice(0, 16)} \u2192 ${new Date(range.to * 1000).toISOString().slice(0, 16)}...`);
         const result = await intelligence.generateBriefing(range);
         if (result) {
