@@ -1,5 +1,5 @@
 const db = require("./db");
-const ollama = require("./ollama");
+const { getConnector } = require("./connectors");
 const config = require("./config");
 
 const DAY = 86400;
@@ -138,7 +138,7 @@ async function generateBriefing(range) {
     `[${s.prev_points}\u2192${s.points} pts] ${s.title}`
   ).join("\n");
 
-  const content = await ollama.chat(
+  const content = await getConnector().chat(
     "You write intelligence briefings based on stories from multiple sources (Hacker News, Reddit, Arxiv, GitHub). Be thorough but clear. No bullet markers. Clear sections. Mention the source when referencing a story.",
     `Generate briefing covering ${fromLabel} to ${toLabel}.
 
@@ -197,7 +197,7 @@ async function generateWeeklyTrend(week) {
   const showHn = stories.filter((s) => s.type === "show_hn" || (s.tags && s.tags.includes("show-hn-competitor")));
   const showBlock = showHn.map((s) => `[${s.points} pts] ${s.title}`).join("\n");
 
-  const content = await ollama.chat(
+  const content = await getConnector().chat(
     "You write concise weekly trend reports about the AI coding tools ecosystem. Under 250 words. Analytical, specific.",
     `Weekly trend report for ${week}. ${stories.length} relevant stories.
 
@@ -341,7 +341,7 @@ async function checkShowHnCompetitors() {
     }
 
     const analysis = db.getAnalysis(story.id);
-    const result = await ollama.chat(
+    const result = await getConnector().chat(
       "You assess whether a new tool is relevant to the user's interests. Be brief. 2-3 sentences. Say whether it's a competitor, potential partner, complementary tool, or irrelevant.",
       `New tool: "${story.title}"\nURL: ${story.url}\nPoints: ${story.points}\n${githubInfo ? "GitHub: " + githubInfo : ""}\n${analysis && analysis.summary ? "Summary: " + analysis.summary : ""}\n\nUser's areas: ${(config.interests || []).slice(0, 3).join("; ")}\n\nIs this relevant? What does it do?`,
       { temperature: 0.3, maxTokens: 200 }

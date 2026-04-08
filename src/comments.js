@@ -1,5 +1,5 @@
 const db = require("./db");
-const ollama = require("./ollama");
+const { getConnector, isAvailable } = require("./connectors");
 const config = require("./config");
 
 function stripHtml(html) {
@@ -43,7 +43,7 @@ function formatThread(newComment, parentChain) {
 
 async function analyzeNewComments(newComments) {
   if (!newComments || newComments.length === 0) return [];
-  if (!ollama.isAvailable()) return [];
+  if (!isAvailable()) return [];
 
   const interests = (config.interests || []).join("\n- ");
 
@@ -75,7 +75,7 @@ async function analyzeNewComments(newComments) {
       `[${i}] Post: "${group.title}" (${group.points}pts)\n${t.formatted}`
     ).join("\n\n---\n\n");
 
-    const result = await ollama.chat(
+    const result = await getConnector().chat(
       `You detect conversations worth joining for someone working in these areas:\n- ${interests}\n\nFor each new comment (marked with >), decide if the user could contribute something meaningful from their experience. Most should be false.\n\nOutput ONLY a JSON array: [{"index":N,"join":true|false,"reason":"one sentence"}]`,
       `These comments just appeared:\n\n${threadsBlock}\n\nJSON array:`,
       { temperature: 0, maxTokens: 600 }
