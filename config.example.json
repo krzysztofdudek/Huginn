@@ -3,7 +3,7 @@
   "hnUsername": null,
   "ollama": {
     "url": "http://localhost:11434",
-    "model": "qwen3.5:9b"
+    "connector": "qwen-3.5-9b"
   },
   "github": {
     "pollMinutes": 60,

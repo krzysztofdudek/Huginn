@@ -8,7 +8,7 @@ const SECRETS_PATH = path.join(__dirname, "..", "secrets.json");
 const DEFAULTS = {
   startDate: null,
   hnUsername: null,
-  ollama: { url: "http://localhost:11434", model: "qwen3.5:9b" },
+  ollama: { url: "http://localhost:11434", connector: "qwen-3.5-9b" },
   github: { pollMinutes: 60, topics: [], watchRepos: [] },
   reddit: { subreddits: [], pollMinutes: 10 },
   collector: { minPoints: 5, pollSeconds: 60, refreshRecentHours: 48 },
