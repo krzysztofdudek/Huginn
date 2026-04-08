@@ -111,7 +111,7 @@ Go to GitHub > Settings > Developer settings > Fine-grained tokens > create one 
 | `interests` | Plain language descriptions of what matters to you. The most important setting. | `[]` |
 | `tags` | Labels the classifier picks from when categorizing stories. | `[]` |
 | `hnUsername` | Your Hacker News username. Set it to get notified when someone replies to your comments. | `null` (skipped) |
-| `ollama.model` | Which local model to use. | `"qwen3.5:9b"` |
+| `ollama.connector` | Which model connector to use. Available: `"qwen-3.5-9b"`, `"gemma4-e4b"`. | `"qwen-3.5-9b"` |
 | `github.topics` | GitHub topics to search for new repos. | `[]` (skipped) |
 | `github.watchRepos` | Repos to monitor for new releases and star changes. | `[]` (skipped) |
 | `reddit.subreddits` | Subreddits to read. | `[]` (skipped) |

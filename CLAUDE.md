@@ -26,7 +26,12 @@ src/
   config.js             Loads config.json + secrets.json, applies defaults, validates keys.
   logger.js             Copies console output to data/huginn.log.
   db.js                 SQLite: table creation, migrations, all database queries.
-  ollama.js             Sends prompts to the local Ollama instance. Handles unavailability.
+  ollama.js             Raw HTTP client for Ollama API. No model logic.
+  connectors/
+    index.js            Registry: auto-discovers connectors, exports active one from config.
+    qwen-3.5-9b.js      Qwen 3.5 9B connector (defaults, <think> stripping).
+    gemma4-e4b.js       Gemma 4 E4B connector (defaults, thinking channel parsing).
+    README.md           Architecture reference for adding new connectors.
 
   collector.js          Fetches Hacker News stories and comments (Algolia API).
   github-collector.js   Searches GitHub repos by topic, checks trending, monitors watched repos.
