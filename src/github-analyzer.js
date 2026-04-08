@@ -1,5 +1,5 @@
 const db = require("./db");
-const ollama = require("./ollama");
+const { getConnector } = require("./connectors");
 const config = require("./config");
 
 const INTERESTS = (config.interests || []).join("\n- ");
@@ -8,7 +8,7 @@ const TAGS = (config.tags || []).join(", ");
 async function classifyRepo(repo) {
   const topicsStr = Array.isArray(repo.topics) ? repo.topics : (() => { try { return JSON.parse(repo.topics); } catch { return []; } })();
 
-  const result = await ollama.chat(
+  const result = await getConnector().chat(
     "You classify GitHub repositories. Output ONLY valid JSON, nothing else.",
     `Classify this GitHub repository. Be STRICT.
 

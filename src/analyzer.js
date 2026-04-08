@@ -1,5 +1,5 @@
 const db = require("./db");
-const ollama = require("./ollama");
+const { getConnector } = require("./connectors");
 const config = require("./config");
 
 const INTERESTS = (config.interests || []).join("\n- ");
@@ -87,7 +87,7 @@ async function classify(story) {
     ? `Be EXTRA strict for Reddit posts. Most Reddit posts are personal questions, support requests, or casual discussion — classify those as "irrelevant". Only mark as "relevant" or "adjacent" if the post shares a tool, technique, data, insight, or experience that would be useful to someone building in these areas. "How do I use X?" is irrelevant. "I built X and here's what I learned" might be adjacent. "Here's a tool that enforces X" is relevant.`
     : `Be strict: "relevant" = directly about AI coding agents, verification, enforcement, knowledge graphs, formal verification, supply chain security. "adjacent" = related to AI impact on software engineering, code review, Copilot/Cursor behavior, developer workflows with AI. "irrelevant" = everything else. NOT relevant: career advice, general AI news, model releases, politics, hardware, writing advice.`;
 
-  const result = await ollama.chat(
+  const result = await getConnector().chat(
     "You classify posts from tech news sources. Output ONLY valid JSON, nothing else.",
     `Classify this post. ${strictness}
 
@@ -123,7 +123,7 @@ Respond with JSON: {"relevance":"relevant|adjacent|irrelevant","tags":["tag1","t
 
 async function summarize(story, content) {
   const text = content || story.title;
-  const result = await ollama.chat(
+  const result = await getConnector().chat(
     "You summarize articles in 2-3 sentences. Output ONLY the summary. No labels, no bullets, no meta-commentary.",
     `Summarize this:\n\nTitle: ${story.title}\n\n${text}`,
     { temperature: 0.3, maxTokens: 300 }
