@@ -14,6 +14,7 @@ const connector = {
     temperature: 0.3,
     maxTokens: 500,
     timeout: 60000,
+    think: false,
   },
 
   async chat(system, user, opts) {
