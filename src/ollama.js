@@ -28,6 +28,7 @@ async function rawChat(model, system, user, opts) {
           { role: "user", content: user },
         ],
         stream: false,
+        ...(opts.think != null ? { think: opts.think } : {}),
         options,
       }),
       signal: AbortSignal.timeout(opts.timeout || 60000),

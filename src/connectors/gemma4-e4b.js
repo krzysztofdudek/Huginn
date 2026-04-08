@@ -17,6 +17,7 @@ const connector = {
     topK: 64,
     maxTokens: 500,
     timeout: 60000,
+    think: false,
   },
 
   async chat(system, user, opts) {

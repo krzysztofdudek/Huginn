@@ -344,7 +344,7 @@ async function runTest() {
   process.stdout.write("  Ollama (" + c.name + " / " + c.ollamaModel + ")... ");
   const ollamaOk = await connectorCheck();
   if (ollamaOk) {
-    const testResult = await c.chat("Say OK", "test", { maxTokens: 5, timeout: 10000 });
+    const testResult = await c.chat("Say OK", "test", { maxTokens: 50, timeout: 30000 });
     if (testResult) { console.log("\x1b[32mOK\x1b[0m"); }
     else { console.log("\x1b[33mreachable but model not responding\x1b[0m"); ok = false; }
   } else {
