@@ -2,7 +2,7 @@ const logger = require("./logger");
 logger.init();
 
 const db = require("./db");
-const ollama = require("./ollama");
+const { getConnector, check: connectorCheck, isAvailable, listConnectors } = require("./connectors");
 const collector = require("./collector");
 const githubCollector = require("./github-collector");
 const redditCollector = require("./reddit-collector");
@@ -164,8 +164,8 @@ async function collect() {
 // ── Phase 2: Analyze ──
 
 async function analyze() {
-  if (!ollama.isAvailable()) {
-    const ok = await ollama.check();
+  if (!isAvailable()) {
+    const ok = await connectorCheck();
     if (!ok) { logWarn("Ollama unavailable. Analysis queued for later."); return; }
   }
 
@@ -289,7 +289,7 @@ async function runIntelligence() {
     }
 
     // Briefing (range-based, triggered by configured hours)
-    if (ollama.isAvailable()) {
+    if (isAvailable()) {
       const briefingRanges = intelligence.getMissingBriefings();
       for (const range of briefingRanges) {
         log(`\ud83d\udccb Generating briefing for ${new Date(range.from * 1000).toISOString().slice(0, 16)} \u2192 ${new Date(range.to * 1000).toISOString().slice(0, 16)}...`);
@@ -340,10 +340,11 @@ async function runTest() {
   let ok = true;
 
   // Ollama
-  process.stdout.write("  Ollama (" + config.ollama.model + ")... ");
-  const ollamaOk = await ollama.check();
+  const c = getConnector();
+  process.stdout.write("  Ollama (" + c.name + " / " + c.ollamaModel + ")... ");
+  const ollamaOk = await connectorCheck();
   if (ollamaOk) {
-    const testResult = await ollama.chat("Say OK", "test", { maxTokens: 5, timeout: 10000 });
+    const testResult = await c.chat("Say OK", "test", { maxTokens: 5, timeout: 10000 });
     if (testResult) { console.log("\x1b[32mOK\x1b[0m"); }
     else { console.log("\x1b[33mreachable but model not responding\x1b[0m"); ok = false; }
   } else {
