@@ -87,9 +87,12 @@ async function classify(story) {
     ? `Be EXTRA strict for Reddit posts. Most Reddit posts are personal questions, support requests, or casual discussion — classify those as "irrelevant". Only mark as "relevant" or "adjacent" if the post shares a tool, technique, data, insight, or experience that would be useful to someone building in these areas. "How do I use X?" is irrelevant. "I built X and here's what I learned" might be adjacent. "Here's a tool that enforces X" is relevant.`
     : `Be strict: "relevant" = directly about AI coding agents, verification, enforcement, knowledge graphs, formal verification, supply chain security. "adjacent" = related to AI impact on software engineering, code review, Copilot/Cursor behavior, developer workflows with AI. "irrelevant" = everything else. NOT relevant: career advice, general AI news, model releases, politics, hardware, writing advice.`;
 
-  const result = await getConnector().chat(
+  const connector = getConnector();
+  const hint = connector.classifyHint ? "\n" + connector.classifyHint : "";
+
+  const result = await connector.chat(
     "You classify posts from tech news sources. Output ONLY valid JSON, nothing else.",
-    `Classify this post. ${strictness}
+    `Classify this post. ${strictness}${hint}
 
 Tags must be from this list ONLY: ${TAGS}
 Pick 1-4 tags that apply. Empty array if irrelevant.
@@ -102,7 +105,7 @@ Type: ${story.type}
 ${story.url ? "URL: " + story.url : ""}
 
 Respond with JSON: {"relevance":"relevant|adjacent|irrelevant","tags":["tag1","tag2"]}`,
-    { temperature: 0, maxTokens: 100 }
+    { temperature: 0, topP: 1.0, topK: 1, maxTokens: 100 }
   );
 
   if (!result) return null;
