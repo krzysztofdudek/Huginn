@@ -124,6 +124,25 @@ const MIGRATIONS = [
       created_at INTEGER NOT NULL
     );`,
   },
+  {
+    version: 3,
+    name: "delivery_messages",
+    up: `
+      CREATE TABLE IF NOT EXISTS delivery_messages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        delivery_id TEXT NOT NULL,
+        seq INTEGER NOT NULL,
+        message TEXT NOT NULL,
+        sent INTEGER DEFAULT 0,
+        sent_at INTEGER,
+        created_at INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_dm_delivery ON delivery_messages(delivery_id);
+      CREATE INDEX IF NOT EXISTS idx_dm_unsent ON delivery_messages(sent, created_at);
+
+      ALTER TABLE deliveries ADD COLUMN stories_json TEXT;
+    `,
+  },
   // Future migrations go here:
 ];
 
@@ -397,11 +416,57 @@ function getDelivery(id) {
   return getDb().prepare("SELECT * FROM deliveries WHERE id = ?").get(id);
 }
 
-function saveDelivery(id, type, content) {
+function saveDelivery(id, type, content, storiesJson) {
   getDb().prepare(`
-    INSERT OR REPLACE INTO deliveries (id, type, sent, generated_at, content)
-    VALUES (?, ?, 0, ?, ?)
-  `).run(id, type, Math.floor(Date.now() / 1000), content);
+    INSERT OR REPLACE INTO deliveries (id, type, sent, generated_at, content, stories_json)
+    VALUES (?, ?, 0, ?, ?, ?)
+  `).run(id, type, Math.floor(Date.now() / 1000), content, storiesJson || null);
+}
+
+function saveDeliveryMessages(deliveryId, messages) {
+  const now = Math.floor(Date.now() / 1000);
+  const stmt = getDb().prepare(
+    "INSERT INTO delivery_messages (delivery_id, seq, message, created_at) VALUES (?, ?, ?, ?)"
+  );
+  const tx = getDb().transaction((items) => {
+    for (let i = 0; i < items.length; i++) {
+      stmt.run(deliveryId, i, items[i], now);
+    }
+  });
+  tx(messages);
+}
+
+function getUnsentMessages() {
+  return getDb().prepare(
+    "SELECT * FROM delivery_messages WHERE sent = 0 ORDER BY created_at ASC, seq ASC"
+  ).all();
+}
+
+function markMessageSent(id) {
+  getDb().prepare("UPDATE delivery_messages SET sent = 1, sent_at = ? WHERE id = ?")
+    .run(Math.floor(Date.now() / 1000), id);
+}
+
+function isDeliveryFullySent(deliveryId) {
+  const unsent = getDb().prepare(
+    "SELECT COUNT(*) as c FROM delivery_messages WHERE delivery_id = ? AND sent = 0"
+  ).get(deliveryId);
+  return unsent.c === 0;
+}
+
+function getDeliveryMessages(deliveryId) {
+  return getDb().prepare(
+    "SELECT * FROM delivery_messages WHERE delivery_id = ? ORDER BY seq ASC"
+  ).all(deliveryId);
+}
+
+function getUnsentDeliveriesWithoutMessages() {
+  return getDb().prepare(`
+    SELECT d.* FROM deliveries d
+    WHERE d.sent = 0
+      AND NOT EXISTS (SELECT 1 FROM delivery_messages dm WHERE dm.delivery_id = d.id)
+    ORDER BY d.generated_at ASC
+  `).all();
 }
 
 function markDeliverySent(id) {
@@ -613,6 +678,7 @@ module.exports = {
   rebuildPeople, getTopPeople,
   enqueue, pendingCount, dequeueBatch, completeWork, failWork, failWorkPermanent,
   getDelivery, saveDelivery, markDeliverySent, getUnsentDeliveries, getDeliveredDays,
+  saveDeliveryMessages, getUnsentMessages, markMessageSent, isDeliveryFullySent, getDeliveryMessages, getUnsentDeliveriesWithoutMessages,
   upsertMyComments, getMyCommentIds, getWatchedThreads, upsertWatchedThread, getNewReplies, setLastReplySeen,
   upsertGithubRepo, upsertGithubRepos, getGithubRepo, getGithubRepoByName,
   getGithubRepoAnalysis, setGithubRepoAnalysis,
