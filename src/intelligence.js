@@ -159,7 +159,11 @@ Sections:
 
   if (!content) return null;
 
-  db.saveDelivery(id, "briefing", content);
+  const storiesJson = JSON.stringify(stories.map((s) => ({
+    id: s.id, title: s.title, url: s.url, points: s.points,
+    type: s.type, relevance: s.relevance, summary: s.summary,
+  })));
+  db.saveDelivery(id, "briefing", content, storiesJson);
   db.setCursor("last_briefing_ts", to);
   return { id, content, storyCount: stories.length, stories, fromLabel, toLabel };
 }
