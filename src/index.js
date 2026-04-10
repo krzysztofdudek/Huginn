@@ -548,7 +548,7 @@ async function main() {
 
   if (args.reset) {
     logWarn("Resetting all analysis (raw data kept)...");
-    db.getDb().exec("DELETE FROM story_analysis; DELETE FROM comment_analysis; DELETE FROM work_queue; DELETE FROM deliveries; DELETE FROM people; DELETE FROM github_repo_analysis;");
+    db.getDb().exec("DELETE FROM story_analysis; DELETE FROM comment_analysis; DELETE FROM work_queue; DELETE FROM deliveries; DELETE FROM delivery_messages; DELETE FROM people; DELETE FROM github_repo_analysis;");
     logDone("Reset complete. Run again without --reset.");
     db.close();
     return;
