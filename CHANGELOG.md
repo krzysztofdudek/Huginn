@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.1.0
+
+Reliable message delivery.
+
+- Every Telegram message is now saved to the database before sending
+- Failed sends are retried automatically on the next cycle, in order
+- Briefing story links are persisted alongside AI content — retries include full link lists
+- All delivery types (briefing, weekly, rising, opportunity, reply, stars, release, competitive) now track individual message delivery status
+- Parent delivery is only marked as "sent" when all its messages have been delivered
+
 ## 1.0.0
 
 First release.
