@@ -160,6 +160,33 @@ const MIGRATIONS = [
       DROP TABLE IF EXISTS quiet_queue;
     `,
   },
+  {
+    version: 5,
+    name: "insights",
+    up: `
+      CREATE TABLE IF NOT EXISTS analysis_runs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        analysis_type TEXT NOT NULL,
+        status TEXT DEFAULT 'running',
+        period_from INTEGER,
+        period_to INTEGER,
+        result_summary TEXT,
+        error TEXT,
+        created_at INTEGER NOT NULL,
+        completed_at INTEGER
+      );
+      CREATE INDEX IF NOT EXISTS idx_ar_type ON analysis_runs(analysis_type, created_at);
+
+      CREATE TABLE IF NOT EXISTS comment_signals (
+        comment_id INTEGER PRIMARY KEY,
+        analysis_run_id INTEGER NOT NULL,
+        extract TEXT NOT NULL,
+        created_at INTEGER NOT NULL
+      );
+
+      ALTER TABLE story_analysis ADD COLUMN growth_pattern TEXT;
+    `,
+  },
 ];
 
 function migrate() {
@@ -647,6 +674,208 @@ function getAllGithubRepos() {
   return getDb().prepare("SELECT * FROM github_repos ORDER BY stars DESC").all();
 }
 
+// ── Analysis runs ──
+
+function getLastAnalysisRun(type) {
+  return getDb().prepare(
+    "SELECT * FROM analysis_runs WHERE analysis_type = ? ORDER BY created_at DESC LIMIT 1"
+  ).get(type);
+}
+
+function getLastCompletedRun(type) {
+  return getDb().prepare(
+    "SELECT * FROM analysis_runs WHERE analysis_type = ? AND status = 'done' ORDER BY created_at DESC LIMIT 1"
+  ).get(type);
+}
+
+function getFailedRuns(type) {
+  return getDb().prepare(
+    "SELECT * FROM analysis_runs WHERE analysis_type = ? AND status = 'failed' ORDER BY created_at ASC"
+  ).all(type);
+}
+
+function startAnalysisRun(type, periodFrom, periodTo) {
+  const now = Math.floor(Date.now() / 1000);
+  const result = getDb().prepare(
+    "INSERT INTO analysis_runs (analysis_type, status, period_from, period_to, created_at) VALUES (?, 'running', ?, ?, ?)"
+  ).run(type, periodFrom, periodTo, now);
+  return result.lastInsertRowid;
+}
+
+function completeAnalysisRun(id, summary) {
+  const now = Math.floor(Date.now() / 1000);
+  getDb().prepare(
+    "UPDATE analysis_runs SET status = 'done', result_summary = ?, completed_at = ? WHERE id = ?"
+  ).run(summary || null, now, id);
+}
+
+function failAnalysisRun(id, error) {
+  const now = Math.floor(Date.now() / 1000);
+  getDb().prepare(
+    "UPDATE analysis_runs SET status = 'failed', error = ?, completed_at = ? WHERE id = ?"
+  ).run(error, now, id);
+}
+
+function recoverStuckRuns(timeoutSeconds) {
+  const cutoff = Math.floor(Date.now() / 1000) - timeoutSeconds;
+  const stuck = getDb().prepare(
+    "SELECT id FROM analysis_runs WHERE status = 'running' AND created_at < ?"
+  ).all(cutoff);
+  const now = Math.floor(Date.now() / 1000);
+  for (const row of stuck) {
+    getDb().prepare(
+      "UPDATE analysis_runs SET status = 'failed', error = 'stuck — process was killed', completed_at = ? WHERE id = ?"
+    ).run(now, row.id);
+  }
+  return stuck.length;
+}
+
+// ── Insight queries ──
+
+function countStoriesSince(ts) {
+  return getDb().prepare("SELECT COUNT(*) as c FROM stories WHERE created_at > ?").get(ts).c;
+}
+
+function countRelevantStoriesSince(ts) {
+  return getDb().prepare(
+    "SELECT COUNT(*) as c FROM stories s JOIN story_analysis sa ON s.id = sa.story_id WHERE sa.relevance IN ('relevant','adjacent') AND s.created_at > ?"
+  ).get(ts).c;
+}
+
+function getSourceRelevanceStats(from, to) {
+  return getDb().prepare(`
+    SELECT s.type, COUNT(*) as total,
+      SUM(CASE WHEN sa.relevance = 'relevant' THEN 1 ELSE 0 END) as relevant,
+      SUM(CASE WHEN sa.relevance = 'adjacent' THEN 1 ELSE 0 END) as adjacent
+    FROM stories s
+    JOIN story_analysis sa ON s.id = sa.story_id
+    WHERE s.created_at >= ? AND s.created_at < ?
+    GROUP BY s.type
+  `).all(from, to);
+}
+
+function getTagCountsInRange(from, to) {
+  const rows = getDb().prepare(`
+    SELECT sa.tags FROM story_analysis sa
+    JOIN stories s ON s.id = sa.story_id
+    WHERE sa.relevance IN ('relevant','adjacent')
+    AND s.created_at >= ? AND s.created_at < ?
+    AND sa.tags IS NOT NULL AND sa.tags != ''
+  `).all(from, to);
+  const counts = {};
+  for (const row of rows) {
+    for (const tag of row.tags.split(",")) {
+      const t = tag.trim();
+      if (t) counts[t] = (counts[t] || 0) + 1;
+    }
+  }
+  return counts;
+}
+
+function getStarGrowth(days) {
+  const now = Math.floor(Date.now() / 1000);
+  const periodStart = now - days * 86400;
+  const prevStart = periodStart - days * 86400;
+  return getDb().prepare(`
+    SELECT r.id, r.full_name, r.stars,
+      r.stars - COALESCE(curr.first_stars, r.stars) as current_growth,
+      COALESCE(prev_g.growth, 0) as previous_growth
+    FROM github_repos r
+    LEFT JOIN (
+      SELECT repo_id, MIN(stars) as first_stars
+      FROM github_star_snapshots WHERE checked_at >= ?
+      GROUP BY repo_id
+    ) curr ON curr.repo_id = r.id
+    LEFT JOIN (
+      SELECT repo_id, MAX(stars) - MIN(stars) as growth
+      FROM github_star_snapshots WHERE checked_at >= ? AND checked_at < ?
+      GROUP BY repo_id
+    ) prev_g ON prev_g.repo_id = r.id
+    WHERE r.stars - COALESCE(curr.first_stars, r.stars) > 0
+    ORDER BY current_growth DESC
+  `).all(periodStart, prevStart, periodStart);
+}
+
+function getUnclassifiedDecayStories(minSnapshots) {
+  return getDb().prepare(`
+    SELECT s.id, s.title, s.created_at, s.points
+    FROM stories s
+    JOIN story_analysis sa ON s.id = sa.story_id
+    WHERE sa.relevance IN ('relevant','adjacent')
+    AND sa.growth_pattern IS NULL
+    AND (SELECT COUNT(*) FROM point_snapshots ps WHERE ps.story_id = s.id) >= ?
+  `).all(minSnapshots);
+}
+
+function getPointTimeline(storyId) {
+  return getDb().prepare(
+    "SELECT points, num_comments, checked_at FROM point_snapshots WHERE story_id = ? ORDER BY checked_at ASC"
+  ).all(storyId);
+}
+
+function setGrowthPattern(storyId, pattern) {
+  getDb().prepare("UPDATE story_analysis SET growth_pattern = ? WHERE story_id = ?").run(pattern, storyId);
+}
+
+function getTopPeopleInRange(from, to, limit) {
+  return getDb().prepare(`
+    SELECT p.username, p.relevant_comments, p.avg_points, p.top_tags, p.last_seen
+    FROM people p
+    WHERE p.last_seen >= ? AND p.last_seen < ?
+    ORDER BY p.relevant_comments * p.avg_points DESC
+    LIMIT ?
+  `).all(from, to, limit);
+}
+
+function getCommentsForRelevantStories(from, to) {
+  return getDb().prepare(`
+    SELECT c.id, c.story_id, c.parent_id, c.author, c.text, c.points, c.created_at,
+      s.title as story_title, sa.summary as story_summary
+    FROM comments c
+    JOIN stories s ON c.story_id = s.id
+    JOIN story_analysis sa ON s.id = sa.story_id
+    WHERE sa.relevance IN ('relevant','adjacent')
+    AND c.created_at >= ? AND c.created_at < ?
+    ORDER BY c.story_id, c.created_at
+  `).all(from, to);
+}
+
+function getCommentParentChain(commentId, storyId, maxDepth) {
+  const chain = [];
+  let currentId = commentId;
+  for (let i = 0; i < (maxDepth || 3); i++) {
+    const parent = getDb().prepare("SELECT * FROM comments WHERE id = ?").get(currentId);
+    if (!parent || parent.id === storyId) break;
+    chain.unshift(parent);
+    currentId = parent.parent_id;
+  }
+  return chain;
+}
+
+function saveCommentSignal(commentId, runId, extractJson) {
+  const now = Math.floor(Date.now() / 1000);
+  getDb().prepare(
+    "INSERT OR REPLACE INTO comment_signals (comment_id, analysis_run_id, extract, created_at) VALUES (?, ?, ?, ?)"
+  ).run(commentId, runId, extractJson, now);
+}
+
+function getCommentSignals(runId) {
+  return getDb().prepare("SELECT * FROM comment_signals WHERE analysis_run_id = ?").all(runId);
+}
+
+function getLastSnapshotTime(storyId) {
+  const row = getDb().prepare(
+    "SELECT MAX(checked_at) as last FROM point_snapshots WHERE story_id = ?"
+  ).get(storyId);
+  return row ? row.last : 0;
+}
+
+function hasNewStarSnapshots(sinceTs) {
+  return getDb().prepare(
+    "SELECT COUNT(*) as c FROM github_star_snapshots WHERE checked_at > ?"
+  ).get(sinceTs).c > 0;
+}
+
 // ── Stats ──
 
 function getStats() {
@@ -687,5 +916,12 @@ module.exports = {
   snapshotGithubStars, getGithubRising,
   upsertGithubRelease, getUnnotifiedReleases, markReleaseNotified,
   getRelevantGithubReposSince, getAllGithubRepos,
+  getLastAnalysisRun, getLastCompletedRun, getFailedRuns,
+  startAnalysisRun, completeAnalysisRun, failAnalysisRun, recoverStuckRuns,
+  countStoriesSince, countRelevantStoriesSince,
+  getSourceRelevanceStats, getTagCountsInRange, getStarGrowth,
+  getUnclassifiedDecayStories, getPointTimeline, setGrowthPattern,
+  getTopPeopleInRange, getCommentsForRelevantStories, getCommentParentChain,
+  saveCommentSignal, getCommentSignals, getLastSnapshotTime, hasNewStarSnapshots,
   getStats, close,
 };
