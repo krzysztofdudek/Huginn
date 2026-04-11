@@ -38,5 +38,20 @@
   ],
   "tags": [
     "tag-one", "tag-two", "tag-three"
-  ]
+  ],
+  "insights": {
+    "enabled": true,
+    "maxPerCycle": 3,
+    "stuckTimeoutMinutes": 60,
+    "analyses": {
+      "pre-trend": { "enabled": true },
+      "competitive-velocity": { "enabled": true },
+      "signal-noise": { "enabled": true },
+      "dead-zone": { "enabled": true },
+      "decay-analysis": { "enabled": true },
+      "people-radar": { "enabled": true },
+      "community-pulse": { "enabled": true },
+      "ecosystem-map": { "enabled": true }
+    }
+  }
 }

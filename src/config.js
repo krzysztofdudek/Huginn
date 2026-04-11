@@ -24,6 +24,21 @@ const DEFAULTS = {
   delivery: "file",
   interests: [],
   tags: [],
+  insights: {
+    enabled: true,
+    maxPerCycle: 3,
+    stuckTimeoutMinutes: 60,
+    analyses: {
+      "pre-trend": { enabled: true },
+      "competitive-velocity": { enabled: true },
+      "signal-noise": { enabled: true },
+      "dead-zone": { enabled: true },
+      "decay-analysis": { enabled: true },
+      "people-radar": { enabled: true },
+      "community-pulse": { enabled: true },
+      "ecosystem-map": { enabled: true },
+    },
+  },
 };
 
 function deepMerge(target, source) {
@@ -68,7 +83,7 @@ if (fs.existsSync(SECRETS_PATH)) {
 // Validate known keys
 const KNOWN_KEYS = new Set([
   "startDate", "hnUsername", "ollama", "github", "reddit", "collector",
-  "analyzer", "intelligence", "quietHours", "quietHoursUTC", "liveComments", "delivery", "interests", "tags", "telegram", "arxiv",
+  "analyzer", "intelligence", "quietHours", "quietHoursUTC", "liveComments", "delivery", "interests", "tags", "insights", "telegram", "arxiv",
 ]);
 for (const key of Object.keys(config)) {
   if (!KNOWN_KEYS.has(key)) {

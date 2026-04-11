@@ -409,7 +409,21 @@ function rebuildDeliveryMessages(delivery) {
   }
 }
 
+// ── Insights ──
+
+async function deliverInsight(pluginId, pluginName, content) {
+  const id = `insight-${pluginId}-${Math.floor(Date.now() / 1000)}`;
+  writeToFile(`${id}.md`, `# ${pluginName}\n\n${content}`);
+  db.saveDelivery(id, "insight", content);
+
+  const mode = config.delivery || "both";
+  if (mode === "file") { db.markDeliverySent(id); return true; }
+
+  return sendAndTrack(id, [content]);
+}
+
 module.exports = {
   deliverBriefing, deliverWeekly, deliverRising, deliverOpportunity, deliverThreadReply, deliverStarChange, deliverRelease, deliverCompetitive,
+  deliverInsight,
   flushUnsent, isQuietHours, writeToFile,
 };
