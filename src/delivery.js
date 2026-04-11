@@ -353,6 +353,9 @@ function rebuildDeliveryMessages(delivery) {
   const mode = config.delivery || "both";
   if (mode === "file") { db.markDeliverySent(delivery.id); return; }
 
+  // Skip deliveries with null/empty content (e.g., insight plugins that don't send alerts)
+  if (!delivery.content) { db.markDeliverySent(delivery.id); return; }
+
   if (delivery.type === "briefing") {
     const stories = delivery.stories_json ? JSON.parse(delivery.stories_json) : [];
     const storyCount = stories.length;
