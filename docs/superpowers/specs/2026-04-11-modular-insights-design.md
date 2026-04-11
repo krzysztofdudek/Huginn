@@ -22,7 +22,7 @@ src/
     dead-zone.js
     decay-analysis.js
     people-radar.js
-    sentiment-drift.js
+    community-pulse.js
     ecosystem-map.js
 ```
 
@@ -122,6 +122,13 @@ CREATE TABLE analysis_runs (
 );
 CREATE INDEX idx_ar_type ON analysis_runs(analysis_type, created_at);
 
+CREATE TABLE comment_signals (
+  comment_id INTEGER PRIMARY KEY,
+  analysis_run_id INTEGER NOT NULL,
+  extract TEXT NOT NULL,           -- JSON: claims, stance, experience_level, action_taken, topics
+  created_at INTEGER NOT NULL
+);
+
 ALTER TABLE story_analysis ADD COLUMN growth_pattern TEXT;
 ```
 
@@ -187,10 +194,70 @@ The Algolia query window expands from 48h to 30 days. Configurable via `config.c
 - Logic: collect relevant stories from last 48h, send to Ollama: "What topics do you see? Compare with this list from last week. Which are growing, which are new?" Returns structured topics with direction.
 - Alert: `🔮 Emerging: "runtime agent monitoring" — 7 stories in 48h, not seen last week`
 
-**7. sentiment-drift**
-- Trigger: weekly, if ≥30 comments on relevant stories
-- Logic: top 20 comments (by points) from relevant stories this week → Ollama: "What's the sentiment around [top 3 tags]? Compare with these comments from last week."
-- Alert: `🌡️ Sentiment shift: MCP servers — enthusiasm → frustration (complexity complaints dominate)`
+**7. community-pulse** (replaces sentiment-drift)
+
+Three-layer analysis of how the community is reacting to topics. No filtering — every comment is analyzed in full context.
+
+*Trigger:* weekly, if any comments exist on relevant/adjacent stories.
+
+*Layer 1 — Signal extraction (per comment, ~1660/week):*
+Each comment is sent to Ollama with full context: story summary + parent comment chain (up to 3 levels). Not classified into a fixed category — instead, Ollama extracts a structured signal:
+
+```json
+{
+  "claims": ["MCP discovery is broken in production", "had to write custom fallback"],
+  "stance": "frustrated but engaged — building workarounds, not abandoning",
+  "experience_level": "practitioner",
+  "action_taken": "built workaround",
+  "topics_referenced": ["mcp-discovery", "production-reliability"]
+}
+```
+
+This preserves the full nuance of long, complex comments. A 500-word comment gets a rich extract, not a single label.
+
+*Layer 2 — Narrative discovery (one call):*
+All extracts from the week are sent to Ollama in one call. No predefined categories — the model discovers what narratives emerged:
+
+```json
+{
+  "narratives": [
+    {
+      "topic": "MCP server reliability in production",
+      "comment_count": 34,
+      "dominant_stance": "practitioners hitting walls, building workarounds",
+      "energy": "high — people care enough to write detailed reports",
+      "key_claims": ["discovery protocol breaks under load", "no good error handling patterns yet"]
+    }
+  ]
+}
+```
+
+Categories are dynamic — they reflect what actually happened that week, not a fixed taxonomy.
+
+*Layer 3 — Week-over-week comparison (one call):*
+Narratives from this week + last week → Ollama identifies shifts:
+
+```
+🧠 Community Pulse — W16
+
+MCP server reliability
+  34 comments across 12 stories. Practitioners are sharing production
+  workarounds. High energy — frustration but engaged, not dismissive.
+  Shift from W15: was "exciting new protocol" → now "how do we make 
+  this actually work."
+
+Claude Code workflows (new)
+  21 comments. Explosion of show-and-tell, mainstream devs arriving.
+  Not present as a distinct narrative in W15.
+
+Agent memory/context (fading)
+  Was dominant in W15 (28 comments). Down to 9 this week.
+  No negative shift — topic feels "solved enough" for now.
+```
+
+*Performance:* ~1660 comments × ~10s each = ~4.5h of Ollama time, once per week. Runs in background, does not block other pipeline phases. Layer 2 and 3 are single calls each.
+
+*Data stored:* Layer 1 extracts saved in a new `comment_signals` table (comment_id, extract JSON, analysis_run_id). Reusable by other plugins. Layer 2/3 results saved in `analysis_runs.result_summary`.
 
 **8. ecosystem-map**
 - Trigger: weekly
@@ -212,7 +279,7 @@ The Algolia query window expands from 48h to 30 days. Configurable via `config.c
       "dead-zone": { "enabled": true },
       "decay-analysis": { "enabled": true },
       "people-radar": { "enabled": true },
-      "sentiment-drift": { "enabled": true },
+      "community-pulse": { "enabled": true },
       "ecosystem-map": { "enabled": true }
     }
   }
