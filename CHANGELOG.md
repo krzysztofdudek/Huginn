@@ -1,5 +1,37 @@
 # Changelog
 
+## 1.2.0
+
+Modular insights — 8 pluggable data analyses with intelligent scheduling.
+
+**Insights framework**
+- Registry-based plugin system: each analysis is a self-contained file in `src/insights/`
+- Intelligent scheduler: plugins decide when to run based on data availability, not fixed timers
+- Full run tracking in `analysis_runs` table — never lose an analysis to crashes or restarts
+- Stuck run detection: recovers from mid-analysis process kills automatically
+- Stampede protection: max 3 analyses per cycle after long downtime
+- Per-plugin enable/disable in config, global kill switch
+- `--test-insights` CLI command for dry-run verification
+
+**8 analysis plugins**
+- `competitive-velocity` — detects GitHub repos with accelerating star growth
+- `signal-noise` — weekly report on relevance ratio per source (HN, Reddit, Arxiv)
+- `dead-zone` — alerts when tracked topics fade (>50% drop vs 4-week baseline)
+- `decay-analysis` — classifies story growth curves (spike/steady/slow-burn/flat)
+- `people-radar` — weekly top contributors in your interest areas
+- `pre-trend` — detects emerging topics before they trend (Ollama, every 6h)
+- `community-pulse` — three-layer community reaction analysis: per-comment signal extraction, narrative discovery, week-over-week comparison (Ollama, weekly)
+- `ecosystem-map` — maps topic clusters, connections, and gaps in the ecosystem (Ollama, weekly)
+
+**Adaptive point tracking**
+- Extended story tracking from 48h to 30 days with tiered snapshot frequency
+- 0-6h: every cycle, 6-48h: every 15min, 2-7d: hourly, 7-30d: every 6h
+- Dramatically reduces snapshot volume while preserving full growth curves
+
+**Testing**
+- 34 tests covering scheduler logic, all SQL plugins with fixture data, Ollama plugins with contract tests
+- Test runner: `npm test` (Node built-in test runner, zero dependencies)
+
 ## 1.1.0
 
 Reliable message delivery, rich logging, quiet hours fix.
