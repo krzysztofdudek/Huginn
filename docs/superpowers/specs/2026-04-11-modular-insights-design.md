@@ -303,3 +303,64 @@ Kill switch: `insights.enabled: false` disables all. Per-plugin: `"pre-trend": {
 **config.example.json:** Add `insights` section.
 
 **No changes:** intelligence.js, analyzer.js, comments.js, connectors/, ollama.js, logger.js.
+
+## Testing
+
+### Scheduler tests (unit, deterministic)
+
+In-memory SQLite, no Ollama. Test the scheduling logic:
+
+- Don't run if last run < interval ago
+- Run if last run failed (retry)
+- Return multiple periods after long downtime
+- Max N per cycle (stampede protection)
+- Stuck detection marks old `running` as `failed`
+- Completed period is not re-run (idempotency)
+
+### SQL plugin tests (fixture data)
+
+Create in-memory DB with known data, verify plugin detects what it should:
+
+- competitive-velocity: repo with 100→200 stars → detected; 100→102 → ignored
+- signal-noise: insert stories with known type/relevance distribution → verify percentages
+- dead-zone: tag with 12/wk baseline, 3 this week → detected; 10 this week → ignored
+- decay-analysis: spike snapshots → "spike"; linear snapshots → "steady"
+- people-radar: user with 12 relevant comments → in top 5; user with 1 → not
+
+### Ollama plugin tests (contract, mock connector)
+
+Mock connector returns hardcoded JSON in expected format. Tests verify:
+
+- Plugin sends well-formed prompt with correct context
+- Plugin parses expected JSON structure without error
+- Plugin handles malformed/empty response gracefully (returns null, doesn't crash)
+- Format function produces valid Telegram HTML
+
+Applies to: pre-trend, community-pulse, ecosystem-map.
+
+### Manual verification: `--test-insights`
+
+New CLI command. Runs all enabled plugins on real data, outputs results to stdout. Does not send to Telegram. For manual verification after changes.
+
+```
+node src/index.js --test-insights
+```
+
+### Test runner
+
+Node built-in test runner (`node --test`). No external dependencies.
+
+```
+test/
+  insights/
+    scheduler.test.js
+    fixtures.js                 Helper: creates in-memory DB with test data
+    competitive-velocity.test.js
+    signal-noise.test.js
+    dead-zone.test.js
+    decay-analysis.test.js
+    people-radar.test.js
+    pre-trend.test.js
+    community-pulse.test.js
+    ecosystem-map.test.js
+```
