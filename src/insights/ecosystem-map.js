@@ -1,6 +1,7 @@
 // src/insights/ecosystem-map.js
 const DAY = 86400;
 const WEEK = 7 * DAY;
+const log = require("../logger");
 
 module.exports = {
   id: "ecosystem-map",
@@ -68,7 +69,8 @@ Return JSON: {"clusters":[{"name":"...","stories":N,"repos":N,"description":"one
         clusters: parsed.clusters,
         message: `Week ${weekNum}\n\n${message}`,
       };
-    } catch {
+    } catch (err) {
+      log.warn(`Ecosystem Map: JSON parse failed: ${err.message}`);
       return null;
     }
   },

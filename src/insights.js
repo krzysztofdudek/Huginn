@@ -80,8 +80,12 @@ async function runDue() {
           const summary = typeof result.summary === "string" ? result.summary : JSON.stringify(result).slice(0, 500);
           db.completeAnalysisRun(runId, summary);
           const formatted = plugin.format(result);
-          await delivery.deliverInsight(plugin.id, plugin.name, formatted);
-          log.info(`${plugin.name}: alert sent ${log.c.dim}${t()}${log.c.reset}`);
+          if (formatted) {
+            await delivery.deliverInsight(plugin.id, plugin.name, formatted);
+            log.info(`${plugin.name}: alert sent ${log.c.dim}${t()}${log.c.reset}`);
+          } else {
+            log.dim(`  ${plugin.name}: completed ${log.c.dim}${t()}${log.c.reset}`);
+          }
         } else {
           db.completeAnalysisRun(runId, null);
           log.dim(`  ${plugin.name}: no alert ${log.c.dim}${t()}${log.c.reset}`);

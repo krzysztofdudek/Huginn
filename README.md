@@ -120,6 +120,16 @@ Go to GitHub > Settings > Developer settings > Fine-grained tokens > create one 
 | `liveComments` | Watch for new comments on relevant HN posts and alert when a conversation is worth joining. Uses more API calls and Ollama time. | `true` |
 | `delivery` | How to send you results. | `"file"` |
 
+The `insights` section in `config.json` turns on deeper analysis that runs in the background:
+
+```json
+"insights": {
+  "enabled": true
+}
+```
+
+When enabled, 8 analysis plugins run automatically after each collect-analyze cycle: Emerging Topics, Fading Topics, Community Pulse, Competitive Velocity, Ecosystem Map, Growth Patterns, People Radar, and Source Quality. Each plugin decides on its own schedule when it has enough data to run. Use `--test-insights` to run them manually and see what they would send.
+
 **`secrets.json`** has your private tokens (never committed to git):
 
 ```json
@@ -142,6 +152,7 @@ npm run briefing                           Generate a briefing for everything si
 npm run trend                              Generate this week's trend report
 npm run reset                              Delete all analysis results (keeps downloaded data)
 node src/index.js --backfill 2026-03-20    Go back and collect older data
+node src/index.js --test-insights          Run all insight analyses, show results, don't send
 node src/index.js --help                   Show all options
 ```
 

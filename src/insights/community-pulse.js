@@ -62,7 +62,9 @@ Extract a structured signal from this comment. Output ONLY JSON:
             signals.push({ commentId: c.id, author: c.author, storyTitle: c.story_title, ...parsed });
             if (runId) db.saveCommentSignal(c.id, runId, JSON.stringify(parsed));
           }
-        } catch {}
+        } catch (err) {
+          log.warn(`Community Pulse: layer 1 JSON parse failed: ${err.message}`);
+        }
       }
 
       if ((i + 1) % 50 === 0) log.dim(`  Layer 1: ${i + 1}/${comments.length} comments processed`);
@@ -99,7 +101,9 @@ Return JSON: {"narratives":[{"topic":"...","comment_count":N,"dominant_stance":"
       try {
         const match = narrativeResult.match(/\{[\s\S]*\}/);
         if (match) narratives = JSON.parse(match[0]).narratives || [];
-      } catch {}
+      } catch (err) {
+        log.warn(`Community Pulse: layer 2 JSON parse failed: ${err.message}`);
+      }
     }
 
     if (narratives.length === 0) return null;
@@ -124,7 +128,9 @@ Return JSON: {"narratives":[{"topic":"...","comment_count":N,"dominant_stance":"
           { temperature: 0.3, maxTokens: 1000, timeout: 120000 }
         );
         if (compResult) comparison = compResult;
-      } catch {}
+      } catch (err) {
+        log.warn(`Community Pulse: layer 3 comparison failed: ${err.message}`);
+      }
     }
 
     // Build final message

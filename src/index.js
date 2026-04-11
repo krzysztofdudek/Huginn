@@ -416,6 +416,24 @@ function showStatus() {
 
   log.heading("Queue");
   log.kvLine("Pending", `${s.pendingWork} | Unsent deliveries: ${s.unsentDeliveries}`);
+
+  const insightsConfig = config.insights || {};
+  if (insightsConfig.enabled) {
+    log.heading("Insights");
+    const d = db.getDb();
+    const runStats = d.prepare("SELECT status, COUNT(*) as c FROM analysis_runs GROUP BY status").all();
+    const statMap = {};
+    for (const row of runStats) statMap[row.status] = row.c;
+    log.kvLine("Runs", `${statMap.done || 0} done, ${statMap.failed || 0} failed, ${statMap.running || 0} running`);
+    const enabledPlugins = insights.getEnabledPlugins();
+    for (const plugin of enabledPlugins) {
+      const last = db.getLastAnalysisRun(plugin.id);
+      const lastStr = last && last.completed_at
+        ? new Date(last.completed_at * 1000).toISOString().replace("T", " ").slice(0, 19) + " UTC"
+        : "(never)";
+      log.kvLine(plugin.name, lastStr);
+    }
+  }
 }
 
 // ── Main cycles ──
@@ -531,7 +549,7 @@ async function main() {
 
   if (args.reset) {
     log.warn("Resetting all analysis (raw data kept)...");
-    db.getDb().exec("DELETE FROM story_analysis; DELETE FROM comment_analysis; DELETE FROM work_queue; DELETE FROM deliveries; DELETE FROM delivery_messages; DELETE FROM people; DELETE FROM github_repo_analysis;");
+    db.getDb().exec("DELETE FROM story_analysis; DELETE FROM comment_analysis; DELETE FROM work_queue; DELETE FROM deliveries; DELETE FROM delivery_messages; DELETE FROM people; DELETE FROM github_repo_analysis; DELETE FROM analysis_runs; DELETE FROM comment_signals;");
     log.success("Reset complete. Run again without --reset.");
     db.close();
     return;

@@ -1,5 +1,6 @@
 // src/insights/competitive-velocity.js
 const DAY = 86400;
+const HOUR = 3600;
 
 module.exports = {
   id: "competitive-velocity",
@@ -8,7 +9,7 @@ module.exports = {
 
   shouldRun(db, lastRun) {
     const now = Math.floor(Date.now() / 1000);
-    if (lastRun && lastRun.status === "done" && (now - lastRun.completed_at) < DAY) return [];
+    if (lastRun && lastRun.status === "done" && (now - lastRun.completed_at) < HOUR) return [];
     if (!db.hasNewStarSnapshots(lastRun ? lastRun.completed_at : 0)) return [];
     const from = lastRun ? lastRun.period_to : now - 7 * DAY;
     return [{ from, to: now }];

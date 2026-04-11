@@ -1,6 +1,7 @@
 // src/insights/pre-trend.js
 const DAY = 86400;
 const HOUR = 3600;
+const log = require("../logger");
 
 module.exports = {
   id: "pre-trend",
@@ -64,7 +65,8 @@ Return JSON: {"topics":[{"name":"topic name","direction":"growing|stable|fading|
         topics: emerging,
         message: lines.join("\n\n"),
       };
-    } catch {
+    } catch (err) {
+      log.warn(`Pre-trend: JSON parse failed: ${err.message}`);
       return null;
     }
   },
