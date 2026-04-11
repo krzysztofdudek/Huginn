@@ -5,6 +5,18 @@ const ALGOLIA = "https://hn.algolia.com/api/v1";
 const DELAY = 150;
 const DAY = 86400;
 
+const HOUR = 3600;
+const MIN = 60;
+const TRACKING_DAYS = config.collector.trackingDays || 30;
+
+function shouldSnapshot(storyAge, timeSinceLastSnapshot) {
+  if (storyAge < 6 * HOUR) return timeSinceLastSnapshot >= 60;
+  if (storyAge < 48 * HOUR) return timeSinceLastSnapshot >= 15 * MIN;
+  if (storyAge < 7 * 86400) return timeSinceLastSnapshot >= HOUR;
+  if (storyAge < TRACKING_DAYS * 86400) return timeSinceLastSnapshot >= 6 * HOUR;
+  return false;
+}
+
 function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
 
 async function fetchPage(url) {
@@ -123,24 +135,30 @@ async function collectMyComments() {
 }
 
 async function refreshRecentPoints() {
-  const sinceTs = Math.floor(Date.now() / 1000) - (config.collector.refreshRecentHours || 48) * 3600;
+  const now = Math.floor(Date.now() / 1000);
+  const sinceTs = now - TRACKING_DAYS * 86400;
   let fetched = 0;
   let matched = 0;
   let newlyQualified = 0;
+  let snapshotted = 0;
   const url = `${ALGOLIA}/search_by_date?tags=story&numericFilters=created_at_i>${sinceTs}`;
   await fetchAllPages(url, (hits) => {
     const stories = hits.map(normalizeStory);
-    // Only update stories we already have in our DB
     for (const s of stories) {
       const existing = db.getStory(s.id);
       if (existing) {
         db.upsertStories([s]);
-        db.snapshotPoints([s]);
+        const storyAge = now - s.created_at;
+        const lastSnapshot = db.getLastSnapshotTime(s.id);
+        const sinceLast = lastSnapshot ? now - lastSnapshot : Infinity;
+        if (shouldSnapshot(storyAge, sinceLast)) {
+          db.snapshotPoints([s]);
+          snapshotted++;
+        }
         matched++;
       }
     }
     fetched += stories.length;
-    // Also check if any new stories now qualify for classification
     for (const s of stories) {
       if (s.points >= (config.collector.minPoints || 5) && !db.getAnalysis(s.id)) {
         db.upsertStories([s]);
@@ -149,7 +167,7 @@ async function refreshRecentPoints() {
       }
     }
   });
-  return { fetched, matched, newlyQualified };
+  return { fetched, matched, newlyQualified, snapshotted };
 }
 
 module.exports = { collectStories, collectMyComments, refreshRecentPoints };

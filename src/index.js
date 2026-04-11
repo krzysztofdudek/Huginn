@@ -92,6 +92,7 @@ async function collect() {
     const refresh = await collector.refreshRecentPoints();
     const refreshParts = [`${log.formatNumber(refresh.matched)} stories updated`];
     if (refresh.newlyQualified > 0) refreshParts.push(`${refresh.newlyQualified} new qualifying`);
+    if (refresh.snapshotted > 0) refreshParts.push(`${refresh.snapshotted} snapshots`);
     pointSpin.done(`HN: ${refreshParts.join(", ")}`);
 
     // GitHub

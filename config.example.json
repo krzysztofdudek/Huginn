@@ -17,7 +17,8 @@
   "collector": {
     "minPoints": 5,
     "pollSeconds": 60,
-    "refreshRecentHours": 48
+    "refreshRecentHours": 48,
+    "trackingDays": 30
   },
   "analyzer": {
     "conversationScoreThreshold": 0.4,
