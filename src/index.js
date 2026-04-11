@@ -15,6 +15,7 @@ const intelligence = require("./intelligence");
 const telegramBot = require("./telegram-bot");
 const hnDeep = require("./hn-deep-fetch");
 const delivery = require("./delivery");
+const insights = require("./insights");
 const config = require("./config");
 
 const POLL_MS = (config.collector.pollSeconds || 60) * 1000;
@@ -23,7 +24,7 @@ function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
 
 function parseArgs() {
   const args = process.argv.slice(2);
-  const result = { reset: false, briefing: false, trend: false, once: false, help: false, test: false, status: false, backfill: null };
+  const result = { reset: false, briefing: false, trend: false, once: false, help: false, test: false, status: false, backfill: null, testInsights: false };
   for (let i = 0; i < args.length; i++) {
     if (args[i] === "--reset") result.reset = true;
     if (args[i] === "--briefing") result.briefing = true;
@@ -33,6 +34,7 @@ function parseArgs() {
     if (args[i] === "--test") result.test = true;
     if (args[i] === "--status") result.status = true;
     if (args[i] === "--backfill" && args[i + 1]) { result.backfill = args[i + 1]; i++; }
+    if (args[i] === "--test-insights") result.testInsights = true;
   }
   return result;
 }
@@ -427,6 +429,9 @@ async function fullCycle() {
   log.phase("Intelligence");
   const actions = await runIntelligence();
   if (actions.length === 0) log.dim("Nothing to deliver.");
+
+  log.phase("Insights");
+  await insights.runDue();
 }
 
 async function liveLoop() {
@@ -475,6 +480,7 @@ function showHelp() {
     node src/index.js --trend                Make this week's trend report right now.
     node src/index.js --backfill 2026-03-20  Go back in time and collect older posts you missed.
     node src/index.js --reset                Start analysis over. Keeps all downloaded data.
+    node src/index.js --test-insights        Run all insight analyses, show results, don't send.
     node src/index.js --help                 Show this message.
 
   ${b}Getting started:${r}
@@ -507,6 +513,12 @@ async function main() {
 
   if (args.status) {
     showStatus();
+    db.close();
+    return;
+  }
+
+  if (args.testInsights) {
+    await insights.testAll();
     db.close();
     return;
   }
