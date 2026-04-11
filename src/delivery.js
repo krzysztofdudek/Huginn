@@ -1,5 +1,6 @@
 const db = require("./db");
 const config = require("./config");
+const log = require("./logger");
 const fs = require("fs");
 const path = require("path");
 
@@ -13,10 +14,10 @@ function escape(text) {
 }
 
 function isQuietHours() {
-  const hours = config.quietHoursUTC;
+  const hours = config.quietHours || config.quietHoursUTC;
   if (!hours || !Array.isArray(hours) || hours.length !== 2) return false;
   const [start, end] = hours;
-  const now = new Date().getUTCHours();
+  const now = config.quietHours ? new Date().getHours() : new Date().getUTCHours();
   if (start < end) {
     return now >= start && now < end; // e.g. [23, 7] doesn't apply here
   }
@@ -34,11 +35,6 @@ function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
 // ── Telegram ──
 
 async function sendTelegram(text) {
-  // During quiet hours, queue to DB instead of sending
-  if (isQuietHours()) {
-    db.enqueueQuiet(text);
-    return true;
-  }
   try {
     const res = await fetch(`${API}/sendMessage`, {
       method: "POST",
@@ -53,12 +49,12 @@ async function sendTelegram(text) {
     });
     if (!res.ok) {
       const body = await res.text();
-      console.error(`  Telegram ${res.status}: ${body.slice(0, 100)}`);
+      log.error(`Telegram HTTP ${res.status}: ${body.slice(0, 120)}`);
       return false;
     }
     return true;
   } catch (err) {
-    console.error(`  Telegram unavailable: ${err.message}`);
+    log.error(`Telegram unavailable: ${err.message}`);
     return false;
   }
 }
@@ -75,21 +71,24 @@ async function flushDeliveryMessages(deliveryId) {
     ? db.getDeliveryMessages(deliveryId).filter((r) => !r.sent)
     : db.getUnsentMessages();
 
+  const stats = { sent: 0, held: 0, failed: 0 };
+
+  if (isQuietHours() && rows.length > 0) {
+    stats.held = rows.length;
+    return stats;
+  }
+
   for (const row of rows) {
-    if (isQuietHours()) {
-      db.enqueueQuiet(row.message);
-      db.markMessageSent(row.id);
-      continue;
-    }
     const ok = await sendTelegram(row.message);
-    if (!ok) return false; // stop on first failure, retry next cycle
+    if (!ok) { stats.failed++; return stats; } // stop on first failure, retry next cycle
+    stats.sent++;
     db.markMessageSent(row.id);
     if (db.isDeliveryFullySent(row.delivery_id)) {
       db.markDeliverySent(row.delivery_id);
     }
     await sleep(200);
   }
-  return true;
+  return stats;
 }
 
 // ── File output ──
@@ -325,44 +324,6 @@ async function deliverCompetitive(content, storyId) {
   return sendAndTrack(id, [text]);
 }
 
-// ── Flush quiet queue (called when quiet hours end) ──
-
-async function flushQuietQueue() {
-  if (isQuietHours()) return 0;
-  const queued = db.getQuietQueue();
-  if (queued.length === 0) return 0;
-
-  let sent = 0;
-
-  if (queued.length <= 3) {
-    for (const item of queued) {
-      const ok = await sendTelegram(item.message);
-      if (ok) sent++;
-      await sleep(200);
-    }
-  } else {
-    const header = `🌙 <b>While you slept</b> (${queued.length} notifications)\n`;
-    let chunk = header;
-    for (const item of queued) {
-      const plain = item.message.replace(/<[^>]+>/g, "").replace(/\n{3,}/g, "\n\n").trim();
-      if (chunk.length + plain.length + 4 > 3800) {
-        const ok = await sendTelegram(chunk);
-        if (ok) sent++;
-        await sleep(200);
-        chunk = "";
-      }
-      chunk += (chunk ? "\n\n---\n\n" : "") + plain;
-    }
-    if (chunk.trim()) {
-      const ok = await sendTelegram(chunk);
-      if (ok) sent++;
-    }
-  }
-
-  db.clearQuietQueue();
-  return sent;
-}
-
 // ── Flush unsent deliveries ──
 
 async function flushUnsent() {
@@ -373,9 +334,19 @@ async function flushUnsent() {
     rebuildDeliveryMessages(d);
   }
 
+  if (orphaned.length > 0) log.dim(`  Rebuilt messages for ${orphaned.length} orphaned delivery(s)`);
+
   // Then: send all unsent messages in order
-  const ok = await flushDeliveryMessages(null);
-  return ok;
+  const stats = await flushDeliveryMessages(null);
+
+  // Mark deliveries where all messages were already sent (e.g., pre-migration deliveries)
+  for (const d of db.getUnsentDeliveries()) {
+    if (db.isDeliveryFullySent(d.id)) {
+      db.markDeliverySent(d.id);
+    }
+  }
+
+  return stats;
 }
 
 function rebuildDeliveryMessages(delivery) {
@@ -440,5 +411,5 @@ function rebuildDeliveryMessages(delivery) {
 
 module.exports = {
   deliverBriefing, deliverWeekly, deliverRising, deliverOpportunity, deliverThreadReply, deliverStarChange, deliverRelease, deliverCompetitive,
-  flushUnsent, flushQuietQueue, isQuietHours, writeToFile,
+  flushUnsent, isQuietHours, writeToFile,
 };

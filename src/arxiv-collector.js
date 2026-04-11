@@ -1,5 +1,6 @@
 const db = require("./db");
 const config = require("./config");
+const log = require("./logger");
 
 // Arxiv categories relevant to AI coding
 const CATEGORIES = (config.arxiv && config.arxiv.categories) || [
@@ -29,7 +30,7 @@ async function arxivFetch(url) {
     if (!res.ok) return null;
     return res.text();
   } catch (err) {
-    console.error(`  Arxiv fetch error: ${err.message}`);
+    log.error(`Arxiv fetch: ${err.message}`);
     return null;
   }
 }

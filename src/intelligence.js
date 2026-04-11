@@ -1,6 +1,7 @@
 const db = require("./db");
 const { getConnector } = require("./connectors");
 const config = require("./config");
+const log = require("./logger");
 
 const DAY = 86400;
 
@@ -154,7 +155,7 @@ Sections:
 **Rising** (1-3 gaining momentum, skip if none)
 **Worth joining** (0-3 discussions with a specific comment to respond to, skip if none)
 **One-liner** (mood/theme in one sentence)`,
-    { temperature: 0.3, maxTokens: 2000 }
+    { temperature: 0.3, maxTokens: 2000, timeout: 300000 }
   );
 
   if (!content) return null;
@@ -215,7 +216,7 @@ Write:
 1. 3-4 themes with post counts and direction (growing/stable/fading vs last week)
 2. New tools section if any Show HN
 3. One sentence: what to watch next week`,
-    { temperature: 0.3, maxTokens: 1000 }
+    { temperature: 0.3, maxTokens: 1000, timeout: 180000 }
   );
 
   if (!content) return null;
@@ -341,7 +342,9 @@ async function checkShowHnCompetitors() {
             githubInfo = `Stars: ${data.stargazers_count}, Language: ${data.language}, Last push: ${data.pushed_at}, Forks: ${data.forks_count}`;
           }
         }
-      } catch {}
+      } catch (err) {
+        log.warn(`GitHub API fetch for competitor check failed: ${err.message}`);
+      }
     }
 
     const analysis = db.getAnalysis(story.id);

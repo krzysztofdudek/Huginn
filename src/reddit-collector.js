@@ -1,5 +1,6 @@
 const db = require("./db");
 const config = require("./config");
+const log = require("./logger");
 
 const SUBREDDITS = (config.reddit && config.reddit.subreddits) || [
   "ClaudeAI", "cursor", "ChatGPTCoding", "LocalLLaMA", "ExperiencedDevs",
@@ -15,7 +16,7 @@ async function fetchRss(url) {
     if (!res.ok) return null;
     return res.text();
   } catch (err) {
-    console.error(`  Reddit RSS error: ${err.message}`);
+    log.error(`Reddit RSS: ${err.message}`);
     return null;
   }
 }
@@ -122,7 +123,7 @@ async function collect() {
       const count = await collectSubreddit(sub);
       totalPosts += count;
     } catch (err) {
-      console.error(`  Reddit r/${sub} error: ${err.message}`);
+      log.error(`Reddit r/${sub}: ${err.message}`);
     }
   }
 

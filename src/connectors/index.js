@@ -17,7 +17,7 @@ const connectorId = config.ollama.connector || "qwen-3.5-9b";
 
 if (!connectors[connectorId]) {
   const available = Object.keys(connectors).join(", ");
-  console.error(`Unknown connector "${connectorId}". Available: ${available}`);
+  console.error(`\x1b[31m\u2717\x1b[0m Unknown connector "${connectorId}". Available: ${available}`);
   process.exit(1);
 }
 

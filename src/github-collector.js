@@ -1,5 +1,6 @@
 const db = require("./db");
 const config = require("./config");
+const log = require("./logger");
 
 const TOKEN = config.github && config.github.token;
 const TOPICS = (config.github && config.github.topics) || [];
@@ -17,7 +18,7 @@ async function ghFetch(url) {
     if (res.status === 403 || res.status === 429) {
       const reset = res.headers.get("x-ratelimit-reset");
       const waitSec = reset ? Math.max(0, parseInt(reset) - Math.floor(Date.now() / 1000)) : 60;
-      console.log(`  GitHub rate limited, waiting ${waitSec}s...`);
+      log.warn(`GitHub rate limited, waiting ${waitSec}s...`);
       await new Promise((r) => setTimeout(r, Math.min(waitSec, 120) * 1000));
       return ghFetch(url);
     }
@@ -26,12 +27,12 @@ async function ghFetch(url) {
     // Rate limit warning only when very low (logged at debug level, doesn't break spinner)
     const remaining = res.headers.get("x-ratelimit-remaining");
     if (remaining && parseInt(remaining) < 5) {
-      console.error(`  GitHub API: only ${remaining} requests remaining`);
+      log.warn(`GitHub API: only ${remaining} requests remaining`);
     }
 
     return res.json();
   } catch (err) {
-    console.error(`  GitHub fetch error: ${err.message}`);
+    log.error(`GitHub fetch: ${err.message}`);
     return null;
   }
 }
@@ -170,7 +171,7 @@ async function collect() {
     // Check API availability
     const test = await ghFetch("https://api.github.com/rate_limit");
     if (!test) {
-      console.log("  GitHub API unavailable");
+      log.warn("GitHub API unavailable");
       return results;
     }
     // Don't log here — spinner is running. Rate limit shown in --test.
@@ -179,7 +180,7 @@ async function collect() {
     results.trending = await discoverTrending();
     results.watched = await updateWatchedRepos();
   } catch (err) {
-    console.error(`  GitHub collect error: ${err.message}`);
+    log.error(`GitHub collect: ${err.message}`);
   }
 
   return results;

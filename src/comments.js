@@ -1,6 +1,7 @@
 const db = require("./db");
 const { getConnector, isAvailable } = require("./connectors");
 const config = require("./config");
+const log = require("./logger");
 
 function stripHtml(html) {
   return (html || "").replace(/<p>/gi, "\n").replace(/<br\s*\/?>/gi, "\n")
@@ -105,7 +106,9 @@ async function analyzeNewComments(newComments) {
           hn_url: `https://news.ycombinator.com/item?id=${t.comment.id}`,
         });
       }
-    } catch {}
+    } catch (err) {
+      log.warn(`Comment analysis JSON parse failed for story ${storyId}: ${err.message}`);
+    }
   }
 
   return opportunities;

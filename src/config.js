@@ -19,7 +19,7 @@ const DEFAULTS = {
     competitive: { checkGithub: true },
     briefingHoursUTC: [8, 20],
   },
-  quietHoursUTC: [23, 7],
+  quietHours: [22, 6],
   liveComments: true,
   delivery: "file",
   interests: [],
@@ -44,7 +44,7 @@ if (fs.existsSync(CONFIG_PATH)) {
   try {
     userConfig = JSON.parse(fs.readFileSync(CONFIG_PATH, "utf-8"));
   } catch (err) {
-    console.error("Warning: config.json parse error:", err.message);
+    console.error("  \x1b[31m\u2717\x1b[0m config.json parse error:", err.message);
   }
 }
 
@@ -61,32 +61,32 @@ if (fs.existsSync(SECRETS_PATH)) {
       config.github.token = secrets.github.token;
     }
   } catch (err) {
-    console.error("Warning: secrets.json parse error:", err.message);
+    console.error("  \x1b[31m\u2717\x1b[0m secrets.json parse error:", err.message);
   }
 }
 
 // Validate known keys
 const KNOWN_KEYS = new Set([
   "startDate", "hnUsername", "ollama", "github", "reddit", "collector",
-  "analyzer", "intelligence", "quietHoursUTC", "liveComments", "delivery", "interests", "tags", "telegram", "arxiv",
+  "analyzer", "intelligence", "quietHours", "quietHoursUTC", "liveComments", "delivery", "interests", "tags", "telegram", "arxiv",
 ]);
 for (const key of Object.keys(config)) {
   if (!KNOWN_KEYS.has(key)) {
-    console.warn(`  Warning: Unknown config key "${key}". Typo?`);
+    console.warn(`  \x1b[33m\u26a0\x1b[0m Unknown config key "${key}" \u2014 typo?`);
   }
 }
 
 // Auto-adjust delivery mode
 if (!config.telegram || !config.telegram.botToken) {
   if (config.delivery !== "file") {
-    console.warn("  No Telegram token in secrets.json. Using file-only delivery.");
+    console.warn("  \x1b[33m\u26a0\x1b[0m No Telegram token in secrets.json \u2014 file-only delivery");
     config.delivery = "file";
   }
 }
 
 // Warn about empty interests
 if (!config.interests || config.interests.length === 0) {
-  console.warn("  No interests configured. All stories will be classified as irrelevant.");
+  console.warn("  \x1b[33m\u26a0\x1b[0m No interests configured \u2014 all stories will be irrelevant");
 }
 
 module.exports = config;

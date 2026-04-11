@@ -1,6 +1,7 @@
 const db = require("./db");
 const { getConnector } = require("./connectors");
 const config = require("./config");
+const log = require("./logger");
 
 const INTERESTS = (config.interests || []).join("\n- ");
 const TAGS = (config.tags || []).join(", ");
@@ -41,7 +42,8 @@ JSON: {"relevance":"relevant|adjacent|irrelevant","tags":[]}`,
     const validTags = new Set(config.tags || []);
     parsed.tags = (parsed.tags || []).filter((t) => validTags.has(t));
     return parsed;
-  } catch {
+  } catch (err) {
+    log.warn(`GitHub repo classify JSON parse failed: ${err.message}`);
     return null;
   }
 }
@@ -59,8 +61,12 @@ async function processClassifyRepoQueue(limit) {
 
     const result = await classifyRepo(repo);
     if (!result) {
-      if (item.attempts >= 2) db.failWorkPermanent(item.id, "classify failed 3 times");
-      else db.failWork(item.id, "classify returned null");
+      if (item.attempts >= 2) {
+        log.warn(`GitHub repo ${repo.full_name}: classify failed permanently after 3 attempts`);
+        db.failWorkPermanent(item.id, "classify failed 3 times");
+      } else {
+        db.failWork(item.id, "classify returned null");
+      }
       continue;
     }
 

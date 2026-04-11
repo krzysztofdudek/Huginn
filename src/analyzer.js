@@ -1,6 +1,7 @@
 const db = require("./db");
 const { getConnector } = require("./connectors");
 const config = require("./config");
+const log = require("./logger");
 
 const INTERESTS = (config.interests || []).join("\n- ");
 const TAGS = (config.tags || []).join(", ");
@@ -119,7 +120,8 @@ Respond with JSON: {"relevance":"relevant|adjacent|irrelevant","tags":["tag1","t
     const validTags = new Set(config.tags || []);
     parsed.tags = (parsed.tags || []).filter((t) => validTags.has(t));
     return parsed;
-  } catch {
+  } catch (err) {
+    log.warn(`Classify JSON parse failed for "${story.title.slice(0, 40)}": ${err.message}`);
     return null;
   }
 }

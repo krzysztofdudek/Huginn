@@ -143,7 +143,23 @@ const MIGRATIONS = [
       ALTER TABLE deliveries ADD COLUMN stories_json TEXT;
     `,
   },
-  // Future migrations go here:
+  {
+    version: 4,
+    name: "migrate_quiet_queue",
+    up: `
+      -- Move queued messages into delivery_messages under a synthetic delivery
+      INSERT OR IGNORE INTO deliveries (id, type, sent, generated_at, content)
+        SELECT 'quiet-legacy', 'quiet', 0, MIN(created_at), 'Migrated from quiet_queue'
+        FROM quiet_queue WHERE (SELECT COUNT(*) FROM quiet_queue) > 0;
+
+      INSERT INTO delivery_messages (delivery_id, seq, message, sent, created_at)
+        SELECT 'quiet-legacy', ROW_NUMBER() OVER (ORDER BY created_at) - 1, message, 0, created_at
+        FROM quiet_queue;
+
+      DELETE FROM quiet_queue;
+      DROP TABLE IF EXISTS quiet_queue;
+    `,
+  },
 ];
 
 function migrate() {
@@ -159,9 +175,9 @@ function migrate() {
     try {
       d.exec(m.up);
       d.prepare("INSERT INTO _migrations (version, name, applied_at) VALUES (?, ?, ?)").run(m.version, m.name, Math.floor(Date.now() / 1000));
-      console.log(`  Migration ${m.version} (${m.name}) applied.`);
+      console.log(`  \x1b[32m\u2713\x1b[0m Migration ${m.version}: ${m.name}`);
     } catch (err) {
-      console.error(`  Migration ${m.version} (${m.name}) failed: ${err.message}`);
+      console.error(`  \x1b[31m\u2717\x1b[0m Migration ${m.version} (${m.name}) failed: ${err.message}`);
       throw err;
     }
   }
@@ -631,20 +647,6 @@ function getAllGithubRepos() {
   return getDb().prepare("SELECT * FROM github_repos ORDER BY stars DESC").all();
 }
 
-// ── Quiet queue ──
-
-function enqueueQuiet(message) {
-  getDb().prepare("INSERT INTO quiet_queue (message, created_at) VALUES (?, ?)").run(message, Math.floor(Date.now() / 1000));
-}
-
-function getQuietQueue() {
-  return getDb().prepare("SELECT * FROM quiet_queue ORDER BY created_at ASC").all();
-}
-
-function clearQuietQueue() {
-  getDb().prepare("DELETE FROM quiet_queue").run();
-}
-
 // ── Stats ──
 
 function getStats() {
@@ -685,6 +687,5 @@ module.exports = {
   snapshotGithubStars, getGithubRising,
   upsertGithubRelease, getUnnotifiedReleases, markReleaseNotified,
   getRelevantGithubReposSince, getAllGithubRepos,
-  enqueueQuiet, getQuietQueue, clearQuietQueue,
   getStats, close,
 };
