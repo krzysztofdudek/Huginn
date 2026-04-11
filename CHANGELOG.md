@@ -2,13 +2,31 @@
 
 ## 1.1.0
 
-Reliable message delivery.
+Reliable message delivery, rich logging, quiet hours fix.
 
+**Reliable delivery**
 - Every Telegram message is now saved to the database before sending
 - Failed sends are retried automatically on the next cycle, in order
 - Briefing story links are persisted alongside AI content — retries include full link lists
 - All delivery types (briefing, weekly, rising, opportunity, reply, stars, release, competitive) now track individual message delivery status
 - Parent delivery is only marked as "sent" when all its messages have been delivered
+
+**Quiet hours unification**
+- Removed dual queuing system (quiet_queue table + delivery_messages) — single source of truth
+- Quiet hours now use local machine time instead of UTC (`quietHours` replaces `quietHoursUTC`)
+- Messages during quiet hours stay as unsent in delivery_messages, sent automatically when quiet hours end
+
+**Logging overhaul**
+- New logger with levels (info/success/warn/error), colored icons, and structured log file
+- Animated spinners show elapsed time on completion (e.g. "9 stories classified 5.6s")
+- Ollama errors and timeouts are now logged with duration (previously silent)
+- Analyzer, classifier, and comment analysis JSON parse failures are now logged (previously silent)
+- Delivery flush reports sent/held/failed counts in terminal
+- Log file uses clean format: `OK/INFO/WARN/ERROR` with ISO timestamps
+
+**Bug fixes**
+- Fixed infinite trend generation loop: delivery was created but never marked as sent, causing retry every cycle
+- Increased Ollama timeouts for briefing (5 min) and trend (3 min) to prevent premature timeout on slower models
 
 ## 1.0.0
 
