@@ -25,25 +25,27 @@ module.exports = {
 
     if (alerts.length === 0) return null;
 
-    // Deduplicate: don't re-alert for same repos as last run
+    // Only report top 5 — dedup against same top 5 from last run
+    const top = alerts.slice(0, 5);
+
     const lastCompleted = db.getLastCompletedRun("competitive-velocity");
     if (lastCompleted && lastCompleted.result_summary) {
       try {
         const prev = JSON.parse(lastCompleted.result_summary);
         const prevRepos = new Set((prev.repos || []).map((r) => r.full_name));
-        const newAlerts = alerts.filter((r) => !prevRepos.has(r.full_name));
-        if (newAlerts.length === 0) return null; // same repos, skip
+        const newInTop = top.filter((r) => !prevRepos.has(r.full_name));
+        if (newInTop.length === 0) return null; // same top repos, skip
       } catch {}
     }
 
-    const lines = alerts.slice(0, 5).map((r) => {
+    const lines = top.map((r) => {
       const prev = r.previous_growth > 0 ? ` (was +${r.previous_growth}/wk)` : " (new)";
       return `${r.full_name}: +${r.current_growth} stars this week${prev}`;
     });
 
     return {
-      summary: JSON.stringify({ repos: alerts.slice(0, 5).map((r) => ({ full_name: r.full_name, growth: r.current_growth })) }),
-      repos: alerts,
+      summary: JSON.stringify({ repos: top.map((r) => ({ full_name: r.full_name, growth: r.current_growth })) }),
+      repos: top,
       message: lines.join("\n"),
     };
   },
