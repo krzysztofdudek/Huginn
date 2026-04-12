@@ -15,7 +15,7 @@ module.exports = {
     return [{ from, to: now }];
   },
 
-  async run(db) {
+  async run(db, connector, period) {
     const repos = db.getStarGrowth(7);
     const alerts = repos.filter((r) => {
       if (r.current_growth < 20) return false;
@@ -25,13 +25,24 @@ module.exports = {
 
     if (alerts.length === 0) return null;
 
+    // Deduplicate: don't re-alert for same repos as last run
+    const lastCompleted = db.getLastCompletedRun("competitive-velocity");
+    if (lastCompleted && lastCompleted.result_summary) {
+      try {
+        const prev = JSON.parse(lastCompleted.result_summary);
+        const prevRepos = new Set((prev.repos || []).map((r) => r.full_name));
+        const newAlerts = alerts.filter((r) => !prevRepos.has(r.full_name));
+        if (newAlerts.length === 0) return null; // same repos, skip
+      } catch {}
+    }
+
     const lines = alerts.slice(0, 5).map((r) => {
       const prev = r.previous_growth > 0 ? ` (was +${r.previous_growth}/wk)` : " (new)";
       return `${r.full_name}: +${r.current_growth} stars this week${prev}`;
     });
 
     return {
-      summary: `${alerts.length} fast movers`,
+      summary: JSON.stringify({ repos: alerts.slice(0, 5).map((r) => ({ full_name: r.full_name, growth: r.current_growth })) }),
       repos: alerts,
       message: lines.join("\n"),
     };
